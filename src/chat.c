@@ -20,6 +20,9 @@
 #include <fcntl.h>
 #include <termios.h>
 #include <signal.h>
+#include <arpa/inet.h>
+
+
 
 /* Secure socket layer headers */
 #include <openssl/ssl.h>
@@ -82,11 +85,11 @@ static void initialize_exitfd(void)
                 perror("fcntl-F_SETFL");
                 exit(EXIT_FAILURE);
         }
-
+        
         /* Set the signal handler. */
         struct sigaction sa;
         sigemptyset(&sa.sa_mask);
-        sa.sa_flags = SA_RESTART;           /* Restart interrupted reads()s */
+        sa.sa_flags = SA_RESTART;           // Restart interrupted reads()s 
         sa.sa_handler = signal_handler;
         if (sigaction(SIGINT, &sa, NULL) == -1) {
                 perror("sigaction");
@@ -104,18 +107,18 @@ static void initialize_exitfd(void)
  * select (if needed), while the encrypted communication should use
  * server_ssl and the SSL API of OpenSSL.
  */
-static int server_fd;
+//static int server_fd;
 static SSL *server_ssl;
 
 /* This variable shall point to the name of the user. The initial value
    is NULL. Set this variable to the username once the user managed to be
    authenticated. */
-static char *user;
+//static char *user;
 
 /* This variable shall point to the name of the chatroom. The initial
    value is NULL (not member of a chat room). Set this variable whenever
    the user changed the chat room successfully. */
-static char *chatroom;
+//static char *chatroom;
 
 /* This prompt is used by the readline library to ask the user for
  * input. It is good style to indicate the name of the user and the
@@ -169,7 +172,7 @@ void readline_callback(char *line)
                         rl_redisplay();
                         return;
                 }
-                char *chatroom = strdup(&(line[i]));
+                //char *chatroom = strdup(&(line[i]));
 
                 /* Process and send this information to the server. */
 
@@ -208,8 +211,8 @@ void readline_callback(char *line)
                         rl_redisplay();
                         return;
                 }
-                char *receiver = strndup(&(line[i]), j - i - 1);
-                char *message = strndup(&(line[j]), j - i - 1);
+                //char *receiver = strndup(&(line[i]), j - i - 1);
+                //char *message = strndup(&(line[j]), j - i - 1);
 
                 /* Send private message to receiver. */
 
@@ -225,7 +228,7 @@ void readline_callback(char *line)
                         rl_redisplay();
                         return;
                 }
-                char *new_user = strdup(&(line[i]));
+                //char *new_user = strdup(&(line[i]));
                 char passwd[48];
                 getpasswd("Password: ", passwd, 48);
 
@@ -247,17 +250,19 @@ void readline_callback(char *line)
         fsync(STDOUT_FILENO);
 }
 
-static BIO *sbio;
-
 int main(int argc, char **argv)
 {
+    if(argc != 3 ){
+        printf("wrong parameters");
+        return -1;
+    }
         initialize_exitfd();
         
         /* Initialize OpenSSL */
 	SSL_library_init();
 	SSL_load_error_strings();
 	SSL_CTX *ssl_ctx = SSL_CTX_new(TLSv1_client_method());
-    if(ssl_ctx == null){
+    if(ssl_ctx == NULL){
         printf("failed to set ssl_ctx\n");
     }
 
@@ -271,7 +276,7 @@ int main(int argc, char **argv)
 	 */
 
 	server_ssl = SSL_new(ssl_ctx);
-    if(server_ssl == null){
+    if(server_ssl == NULL){
         printf("server_ssl is null\n");
     }
 
@@ -289,7 +294,7 @@ int main(int argc, char **argv)
 	 * stream, which even may crash the server.
 	 */
 
-     char msg[1024]; //2048
+     //char msg[1024]; //2048
 
     /* Set up secure connection to the chatd server. */
      struct sockaddr_in server_addr;
@@ -362,7 +367,7 @@ int main(int argc, char **argv)
                         int signum;
                         for (;;) {
                                 if (read(exitfd[0], &signum, sizeof(signum)) == -1) {
-                                        if (errno = EAGAIN) {
+                                        if (errno == EAGAIN) {
                                                 break;
                                         } else {
                                                 perror("read()");
