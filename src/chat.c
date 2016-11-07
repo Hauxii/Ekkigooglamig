@@ -247,6 +247,9 @@ void readline_callback(char *line)
         fsync(STDOUT_FILENO);
 }
 
+static BIO *sbio;
+static char rbuf[50] = {'a'};
+
 int main(int argc, char **argv)
 {
         initialize_exitfd();
@@ -273,7 +276,7 @@ int main(int argc, char **argv)
 	 */
 
 	/* Use the socket for the SSL connection. */
-	SSL_set_fd(server_ssl, server_fd);
+	//SSL_set_fd(server_ssl, server_fd);
 
 	/* Now we can create BIOs and use them instead of the socket.
 	 * The BIO is responsible for maintaining the state of the
@@ -283,12 +286,37 @@ int main(int argc, char **argv)
 	 */
 
         /* Set up secure connection to the chatd server. */
+     struct sockaddr_in server_addr;
+     int sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+     const int server_port = strtol(argv[2], NULL, 10);
+     //TODO: check error
+     
+     memset (&server_addr, '\0', sizeof(server_addr));
+     server_addr.sin_family      = AF_INET;
+     server_addr.sin_port        = htons(server_port);
+     server_addr.sin_addr.s_addr = inet_addr(argv[1]);
+
+     connect(sock, (struct sockaddr *) &server_addr, sizeof(server_addr));
+     //TODO: check error
+
+     sbio=BIO_new(BIO_s_socket());
+     BIO_set_fd(sbio, sock, BIO_NOCLOSE);
+     SSL_set_bio(server_ssl, sbio, sbio);
+
+     SSL_connect(server_ssl);
+     printf("Connected with %s encryption\n", SSL_get_cipher(server_ssl));
+     char *msg = "Hello WORLD";
+     SSL_write(server_ssl, msg, strlen(msg));
 
         /* Read characters from the keyboard while waiting for input.
          */
         prompt = strdup("> ");
         rl_callback_handler_install(prompt, (rl_vcpfunc_t*) &readline_callback);
         for (;;) {
+            int bytes = SSL_read(server_ssl, rbuf, sizeof(rbuf));
+            printf("%s\n", rbuf);
+
+
                 fd_set rfds;
 		struct timeval timeout;
 
@@ -347,6 +375,7 @@ int main(int argc, char **argv)
                 }
 
                 /* Handle messages from the server here! */
+                
         }
         
         /* replace by code to shutdown the connection and exit

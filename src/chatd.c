@@ -17,6 +17,9 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+
 #include <glib.h>
 
 
@@ -52,11 +55,17 @@ gint fd_cmp(gconstpointer fd1,  gconstpointer fd2, gpointer G_GNUC_UNUSED data)
      return GPOINTER_TO_INT(fd1) - GPOINTER_TO_INT(fd2);
 }
 
-
+static int server_fd;
+static SSL *server_ssl;
+static BIO *sbio;
+//static char rbuf[512];
 
 int main(int argc, char **argv)
 {
      struct sockaddr_in server, client;
+
+     int listen_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+     //CHK_ERR(listen_sock, "socket");
 
      if (argc != 2) {
           fprintf(stderr, "Usage: %s <port>\n", argv[0]);
@@ -66,8 +75,52 @@ int main(int argc, char **argv)
      const int server_port = strtol(argv[1], NULL, 10);
 
      /* Initialize OpenSSL */
+    SSL_library_init();
+    SSL_load_error_strings();
+    SSL_CTX *ssl_ctx = SSL_CTX_new(TLSv1_server_method());
 
-     /* Receive and handle messages. */
+    /* núlla structið */
+    memset(&server, 0, sizeof(server));
+    server.sin_family      = AF_INET;
+    server.sin_addr.s_addr = INADDR_ANY;
+    server.sin_port        = htons(server_port); 
+
+    //TODO: error check
+    bind(listen_sock, (struct sockaddr *) &server, sizeof(server));
+
+    //Receive a TCP connection
+    //TODO: error check
+    listen(listen_sock, 5);
+    
+
+    for(;;){
+      /* Receive and handle messages. */
+      socklen_t client_len = (socklen_t) sizeof(client);
+      int sock = accept(listen_sock, (struct sockaddr *)&client, &client_len);
+
+      printf("<timestamp> : %s:%d connected\n", inet_ntoa(client.sin_addr), ntohs(client.sin_port));
+      server_ssl = SSL_new(ssl_ctx);
+
+      sbio=BIO_new(BIO_s_socket());
+      BIO_set_fd(sbio, sock, BIO_NOCLOSE);
+      SSL_set_bio(server_ssl, sbio, sbio);
+
+      SSL_accept(server_ssl);
+      char buff[1024] = {'\0'};
+      int bytes = SSL_read(server_ssl, buff, sizeof(buff));
+      buff[bytes] = 0;
+      printf("received: %s and this many bites: %d", buff, bytes);
+
+      char *buf = "Welcome";
+      SSL_write(server_ssl, buf, strlen(buf));
+      
+      //SSL_set_fd(server_ssl, sock);
+
+      
+      //BIO_printf(bio_c_out, "<timestamp> : %lx:%x connected\n", client.sin_addr.s_addr, client.sin_port);
+
+    }
+     
 
      exit(EXIT_SUCCESS);
 }
