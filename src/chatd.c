@@ -82,7 +82,7 @@ int main(int argc, char **argv)
     /* núlla structið */
     memset(&server, 0, sizeof(server));
     server.sin_family      = AF_INET;
-    server.sin_addr.s_addr = INADDR_ANY;
+    server.sin_addr.s_addr = htonl(INADDR_ANY);
     server.sin_port        = htons(server_port); 
 
     //TODO: error check
@@ -99,20 +99,22 @@ int main(int argc, char **argv)
       int sock = accept(listen_sock, (struct sockaddr *)&client, &client_len);
 
       printf("<timestamp> : %s:%d connected\n", inet_ntoa(client.sin_addr), ntohs(client.sin_port));
+      
       server_ssl = SSL_new(ssl_ctx);
-
-      sbio=BIO_new(BIO_s_socket());
-      BIO_set_fd(sbio, sock, BIO_NOCLOSE);
-      SSL_set_bio(server_ssl, sbio, sbio);
-
-      SSL_accept(server_ssl);
-      char buff[1024] = {'\0'};
-      int bytes = SSL_read(server_ssl, buff, sizeof(buff));
-      buff[bytes] = 0;
-      printf("received: %s and this many bites: %d", buff, bytes);
-
-      char *buf = "Welcome";
-      SSL_write(server_ssl, buf, strlen(buf));
+      if(server_ssl){
+        SSL_set_fd(server_ssl, sock);
+        int err = SSL_accept(server_ssl);
+        if(err == -1){
+          printf("SSL connection failed (SSL_accept)\n");
+        } else{
+          err = SSL_write(server_ssl, "Welcome!", 8);
+          if(err == -1){
+            printf("ERROR SENDING MESSAGE\n");
+          }
+        }
+      } else {
+        printf("SSL connection failed (SSL_new)\n");
+      }
       
       //SSL_set_fd(server_ssl, sock);
 

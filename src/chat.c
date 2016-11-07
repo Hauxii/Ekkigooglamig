@@ -248,7 +248,6 @@ void readline_callback(char *line)
 }
 
 static BIO *sbio;
-static char rbuf[50] = {'a'};
 
 int main(int argc, char **argv)
 {
@@ -258,6 +257,9 @@ int main(int argc, char **argv)
 	SSL_library_init();
 	SSL_load_error_strings();
 	SSL_CTX *ssl_ctx = SSL_CTX_new(TLSv1_client_method());
+    if(ssl_ctx == null){
+        printf("failed to set ssl_ctx\n");
+    }
 
 	/* TODO:
 	 * We may want to use a certificate file if we self sign the
@@ -269,14 +271,16 @@ int main(int argc, char **argv)
 	 */
 
 	server_ssl = SSL_new(ssl_ctx);
+    if(server_ssl == null){
+        printf("server_ssl is null\n");
+    }
 
 	/* Create and set up a listening socket. The sockets you
 	 * create here can be used in select calls, so do not forget
 	 * them.
 	 */
 
-	/* Use the socket for the SSL connection. */
-	//SSL_set_fd(server_ssl, server_fd);
+	
 
 	/* Now we can create BIOs and use them instead of the socket.
 	 * The BIO is responsible for maintaining the state of the
@@ -285,9 +289,14 @@ int main(int argc, char **argv)
 	 * stream, which even may crash the server.
 	 */
 
-        /* Set up secure connection to the chatd server. */
+     char msg[1024]; //2048
+
+    /* Set up secure connection to the chatd server. */
      struct sockaddr_in server_addr;
      int sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+     if(sock == -1){
+        printf("sock error\n");
+     }
      const int server_port = strtol(argv[2], NULL, 10);
      //TODO: check error
      
@@ -296,29 +305,28 @@ int main(int argc, char **argv)
      server_addr.sin_port        = htons(server_port);
      server_addr.sin_addr.s_addr = inet_addr(argv[1]);
 
-     connect(sock, (struct sockaddr *) &server_addr, sizeof(server_addr));
-     //TODO: check error
+     int conn_error = connect(sock, (struct sockaddr *) &server_addr, sizeof(server_addr));
+     if(conn_error == -1){
+        printf("connection error\n");
+     }
 
-     sbio=BIO_new(BIO_s_socket());
-     BIO_set_fd(sbio, sock, BIO_NOCLOSE);
-     SSL_set_bio(server_ssl, sbio, sbio);
+     /* Use the socket for the SSL connection. */
+    SSL_set_fd(server_ssl, sock);
 
-     SSL_connect(server_ssl);
+     int handshake = SSL_connect(server_ssl);
+     if(handshake == -1){
+        printf("handshake error\n");
+     }
+
      printf("Connected with %s encryption\n", SSL_get_cipher(server_ssl));
-     char *msg = "Hello WORLD";
-     SSL_write(server_ssl, msg, strlen(msg));
 
         /* Read characters from the keyboard while waiting for input.
          */
         prompt = strdup("> ");
         rl_callback_handler_install(prompt, (rl_vcpfunc_t*) &readline_callback);
         for (;;) {
-            int bytes = SSL_read(server_ssl, rbuf, sizeof(rbuf));
-            printf("%s\n", rbuf);
-
-
-                fd_set rfds;
-		struct timeval timeout;
+            fd_set rfds;
+	       struct timeval timeout;
 
                 /* You must change this. Keep exitfd[0] in the read set to
                    receive the message from the signal handler. Otherwise,
@@ -326,8 +334,8 @@ int main(int argc, char **argv)
                 FD_ZERO(&rfds);
                 FD_SET(STDIN_FILENO, &rfds);
                 FD_SET(exitfd[0], &rfds);
-		timeout.tv_sec = 5;
-		timeout.tv_usec = 0;
+		      timeout.tv_sec = 5;
+		      timeout.tv_usec = 0;
 		
                 int r = select(exitfd[0] + 1, &rfds, NULL, NULL, &timeout);
                 if (r < 0) {
@@ -375,7 +383,10 @@ int main(int argc, char **argv)
                 }
 
                 /* Handle messages from the server here! */
-                
+                //char rbuf[50] = {'a'};
+                //int bytes = SSL_read(server_ssl, rbuf, sizeof(rbuf));
+                //rbuf[bytes] = 0;
+                //printf("%s\n", rbuf);
         }
         
         /* replace by code to shutdown the connection and exit
