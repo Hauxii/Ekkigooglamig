@@ -294,7 +294,7 @@ int main(int argc, char **argv)
 	 * stream, which even may crash the server.
 	 */
 
-     //char msg[1024]; //2048
+     char msg[1024]; //2048
 
     /* Set up secure connection to the chatd server. */
      struct sockaddr_in server_addr;
@@ -338,11 +338,11 @@ int main(int argc, char **argv)
                    the chat client can break in terrible ways. */
                 FD_ZERO(&rfds);
                 FD_SET(STDIN_FILENO, &rfds);
-                FD_SET(exitfd[0], &rfds);
+                FD_SET(sock, &rfds);
 		      timeout.tv_sec = 5;
 		      timeout.tv_usec = 0;
 		
-                int r = select(exitfd[0] + 1, &rfds, NULL, NULL, &timeout);
+                int r = select(((sock > STDIN_FILENO) ? sock : STDIN_FILENO) + 1, &rfds, NULL, NULL, &timeout);
                 if (r < 0) {
                         if (errno == EINTR) {
                                 /* This should either retry the call or
@@ -359,7 +359,7 @@ int main(int argc, char **argv)
                         fsync(STDOUT_FILENO);
                         /* Whenever you print out a message, call this
                            to reprint the current input line. */
-			rl_redisplay();
+			             rl_redisplay();
                         continue;
                 }
                 if (FD_ISSET(exitfd[0], &rfds)) {
@@ -388,6 +388,18 @@ int main(int argc, char **argv)
                 }
 
                 /* Handle messages from the server here! */
+                int length = SSL_read(server_ssl, msg, sizeof(msg) -1);
+
+                if(length == -1){
+                    printf("Could not read from server\n");
+                }
+                if(length == 0){
+                    //conn terminated
+                    break;
+                }
+
+                msg[length] = '\0';
+                write(STDOUT_FILENO, msg, strlen(msg));
                 //char rbuf[50] = {'a'};
                 //int bytes = SSL_read(server_ssl, rbuf, sizeof(rbuf));
                 //rbuf[bytes] = 0;
