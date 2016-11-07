@@ -55,9 +55,8 @@ gint fd_cmp(gconstpointer fd1,  gconstpointer fd2, gpointer G_GNUC_UNUSED data)
      return GPOINTER_TO_INT(fd1) - GPOINTER_TO_INT(fd2);
 }
 
-static int server_fd;
+//static int server_fd;
 static SSL *server_ssl;
-static BIO *sbio;
 //static char rbuf[512];
 
 int main(int argc, char **argv)
