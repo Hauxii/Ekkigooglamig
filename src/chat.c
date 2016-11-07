@@ -110,6 +110,7 @@ static void initialize_exitfd(void)
 //static int server_fd;
 static SSL *server_ssl;
 
+
 /* This variable shall point to the name of the user. The initial value
    is NULL. Set this variable to the username once the user managed to be
    authenticated. */
@@ -229,8 +230,8 @@ void readline_callback(char *line)
                         return;
                 }
                 //char *new_user = strdup(&(line[i]));
-                char passwd[48];
-                getpasswd("Password: ", passwd, 48);
+               // char passwd[48];
+               // getpasswd("Password: ", passwd, 48);
 
                 /* Process and send this information to the server. */
 
