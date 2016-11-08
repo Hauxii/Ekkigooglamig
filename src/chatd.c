@@ -22,6 +22,9 @@
 
 #include <glib.h>
 
+#define RSA_SERVER_CERT     "server.crt"
+#define RSA_SERVER_KEY      "server.key"
+
 
 /* This can be used to build instances of GTree that index on
    the address of a connection. */
@@ -78,6 +81,16 @@ int main(int argc, char **argv)
     SSL_load_error_strings();
     SSL_CTX *ssl_ctx = SSL_CTX_new(TLSv1_server_method());
 
+    if(SSL_CTX_use_certificate_file(ssl_ctx, RSA_SERVER_CERT, SSL_FILETYPE_PEM) <= 0){
+      printf("error loading crt file\n");
+    }
+    if(SSL_CTX_use_PrivateKey_file(ssl_ctx, RSA_SERVER_KEY, SSL_FILETYPE_PEM) <= 0){
+      printf("error loading key file\n");
+    }
+    if(!SSL_CTX_check_private_key(ssl_ctx)){
+      printf("key and certificate dont match\n");
+    }
+
     /* núlla structið */
     memset(&server, 0, sizeof(server));
     server.sin_family      = AF_INET;
@@ -90,15 +103,15 @@ int main(int argc, char **argv)
     //Receive a TCP connection
     //TODO: error check
     listen(listen_sock, 5);
+    int sock;
     
-
     for(;;){
       /* Receive and handle messages. */
       socklen_t client_len = (socklen_t) sizeof(client);
-      int sock = accept(listen_sock, (struct sockaddr *)&client, &client_len);
+      sock = accept(listen_sock, (struct sockaddr *)&client, &client_len);
 
       printf("<timestamp> : %s:%d connected\n", inet_ntoa(client.sin_addr), ntohs(client.sin_port));
-      
+
       server_ssl = SSL_new(ssl_ctx);
       if(server_ssl){
         SSL_set_fd(server_ssl, sock);
