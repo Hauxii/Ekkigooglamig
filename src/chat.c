@@ -250,6 +250,7 @@ void readline_callback(char *line)
         snprintf(buffer, 255, "Message: %s\n", line);
         write(STDOUT_FILENO, buffer, strlen(buffer));
         fsync(STDOUT_FILENO);
+        //SSL_write(server_ssl, buffer, strlen(buffer));
 }
 
 int main(int argc, char **argv)
@@ -404,22 +405,27 @@ int main(int argc, char **argv)
                 }
 
                 /* Handle messages from the server here! */
-                int length = SSL_read(server_ssl, msg, sizeof(msg) -1);
+                if(FD_ISSET(sock, &rfds)){
+                    int length = SSL_read(server_ssl, msg, sizeof(msg) -1);
 
-                if(length == -1){
-                    printf("Could not read from server\n");
-                }
-                if(length == 0){
-                    //conn terminated
-                    break;
-                }
+                    if(length == -1){
+                        printf("Could not read from server\n");
+                    }
+                    if(length == 0){
+                        //conn terminated
+                        printf("connection terminated\n");
+                        break;
+                    }
 
-                msg[length] = '\0';
-                write(STDOUT_FILENO, msg, strlen(msg));
-                //char rbuf[50] = {'a'};
-                //int bytes = SSL_read(server_ssl, rbuf, sizeof(rbuf));
-                //rbuf[bytes] = 0;
-                //printf("%s\n", rbuf);
+                    msg[length] = '\0';
+                    //write(STDOUT_FILENO, msg, strlen(msg));
+                    printf("%s\n", msg);
+                    //char rbuf[50] = {'a'};
+                    //int bytes = SSL_read(server_ssl, rbuf, sizeof(rbuf));
+                    //rbuf[bytes] = 0;
+                    //printf("%s\n", rbuf);
+                }
+                
         }
         
         /* replace by code to shutdown the connection and exit

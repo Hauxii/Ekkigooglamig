@@ -133,6 +133,14 @@ int main(int argc, char **argv)
                 if(err == -1){
                     printf("ERROR SENDING MESSAGE\n");
                 }
+                char buffer[512] = {'\0'};
+                int bytes = SSL_read(server_ssl, buffer, strlen(buffer));
+                if(bytes == -1){
+                    printf("Error reading from client\n");
+                } else {
+                    printf("%s\n", buffer);
+                }
+                
             }
         }
     }
