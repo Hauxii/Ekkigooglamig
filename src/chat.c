@@ -373,11 +373,11 @@ int main(int argc, char **argv)
                         break;
                 }
                 if (r == 0) {
-                        write(STDOUT_FILENO, "No message?\n", 12);
+                        //write(STDOUT_FILENO, "No message?\n", 12);
                         fsync(STDOUT_FILENO);
                         /* Whenever you print out a message, call this
                            to reprint the current input line. */
-			             rl_redisplay();
+			             //rl_redisplay();
                         continue;
                 }
                 if (FD_ISSET(exitfd[0], &rfds)) {

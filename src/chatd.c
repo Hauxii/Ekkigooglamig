@@ -82,7 +82,7 @@ gboolean get_data_from_users(gpointer key, gpointer user, gpointer ret){
     fd_set *curr_rfds = (fd_set*) ret;
     if(FD_ISSET(curr_user->conn_fd, curr_rfds)){
         //printf("Tried to read message from user\n");
-        char buffer[512] = {'\0'};
+        char buffer[1024] = {'\0'};
         int bytes = SSL_read(curr_user->conn_ssl, buffer, sizeof(buffer)-1);
         if(bytes <= 0){
             SSL_shutdown(curr_user->conn_ssl);
