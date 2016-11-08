@@ -22,6 +22,8 @@
 #include <signal.h>
 #include <arpa/inet.h>
 
+#include <glib.h>
+
 /* Secure socket layer headers */
 #include <openssl/ssl.h>
 #include <openssl/err.h>
@@ -47,11 +49,17 @@ void
 signal_handler(int signum)
 {
         int _errno = errno;
+        write(STDOUT_FILENO, "err%d?",_errno);
+        if(write(exitfd[1], &signum, sizeof(signum)) == -1){
+            write(STDOUT_FILENO, "$$$$$$$$$$$$$$%d",_errno);
+        }
         if (write(exitfd[1], &signum, sizeof(signum)) == -1 && errno != EAGAIN) {
+            //write(STDOUT_FILENO, "aborting %d",5);
                         abort();
         }
         fsync(exitfd[1]);
         errno = _errno;
+        //write(STDOUT_FILENO, "ran signal handler end%d",6);
 }
 
 
@@ -147,6 +155,7 @@ void readline_callback(char *line)
         if ((strncmp("/bye", line, 4) == 0) ||
             (strncmp("/quit", line, 5) == 0)) {
                 rl_callback_handler_remove();
+                g_print("you typed /bye or /quit\n");
                 signal_handler(SIGTERM);
                 return;
         }
@@ -334,6 +343,7 @@ int main(int argc, char **argv)
         printf("handshake error\n");
      }
 
+
      printf("Connected with %s encryption\n", SSL_get_cipher(server_ssl));
 
      X509 *server_crt;
@@ -371,14 +381,14 @@ int main(int argc, char **argv)
                         perror("select()");
                         break;
                 }
-                if (r == 0) {
+/*                if (r == 0) {
                         write(STDOUT_FILENO, "No message?\n", 12);
                         fsync(STDOUT_FILENO);
-                        /* Whenever you print out a message, call this
-                           to reprint the current input line. */
+                        // Whenever you print out a message, call this
+                        //   to reprint the current input line. 
 			             rl_redisplay();
                         continue;
-                }
+                }*/
                 if (FD_ISSET(exitfd[0], &rfds)) {
                         /* We received a signal. */
                         int signum;
