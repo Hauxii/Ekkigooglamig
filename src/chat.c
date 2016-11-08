@@ -250,7 +250,7 @@ void readline_callback(char *line)
         snprintf(buffer, 255, "Message: %s\n", line);
         write(STDOUT_FILENO, buffer, strlen(buffer));
         fsync(STDOUT_FILENO);
-        //SSL_write(server_ssl, buffer, strlen(buffer));
+        SSL_write(server_ssl, buffer, strlen(buffer));
 }
 
 int main(int argc, char **argv)
@@ -355,6 +355,7 @@ int main(int argc, char **argv)
                    the chat client can break in terrible ways. */
                 FD_ZERO(&rfds);
                 FD_SET(STDIN_FILENO, &rfds);
+                FD_SET(exitfd[0], &rfds);
                 FD_SET(sock, &rfds);
 		      timeout.tv_sec = 5;
 		      timeout.tv_usec = 0;
@@ -430,4 +431,10 @@ int main(int argc, char **argv)
         
         /* replace by code to shutdown the connection and exit
            the program. */
+        SSL_shutdown(server_ssl);
+        close(sock);
+        SSL_free(server_ssl);
+        SSL_CTX_free(ssl_ctx);
+
+        exit(EXIT_SUCCESS);
 }
