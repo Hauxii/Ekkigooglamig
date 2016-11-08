@@ -90,6 +90,15 @@ gboolean update_fd(gpointer key, gpointer user, gpointer ret){
     return FALSE;
 }
 
+gboolean send_message_to_all(gpointer key, gpointer user, gpointer message){
+    struct user *curr_user = (struct user *) user;
+    int err = SSL_write(curr_user->conn_ssl, message, strlen(message));
+    if(err == -1){
+        printf("ERROR SENDING MESSAGE\n");
+    }
+    return FALSE;
+}
+
 gboolean get_data_from_users(gpointer key, gpointer user, gpointer ret){
     struct user *curr_user = (struct user *) user;
     fd_set *curr_rfds = (fd_set*) ret;
@@ -104,12 +113,10 @@ gboolean get_data_from_users(gpointer key, gpointer user, gpointer ret){
             g_tree_remove(userlist, key); 
         }
         else{
+
             buffer[bytes] = '\0';
-            printf("recieved and sent back message: %s", buffer);
-            int err = SSL_write(curr_user->conn_ssl, buffer, strlen(buffer));
-            if(err == -1){
-                printf("ERROR SENDING MESSAGE\n");
-            }
+            g_tree_foreach(userlist, send_message_to_all, buffer);            
+            //printf("recieved and sent back message: %s", buffer);
         }
         
     }

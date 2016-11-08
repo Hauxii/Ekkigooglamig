@@ -250,7 +250,7 @@ void readline_callback(char *line)
                 return;
         }
         /* Sent the buffer to the server. */
-        snprintf(buffer, 255, "Message: %s\n", line);
+        snprintf(buffer, 255, "%s", line);
         //write(STDOUT_FILENO, buffer, strlen(buffer));
         //fsync(STDOUT_FILENO);
         SSL_write(server_ssl, buffer, strlen(buffer));
