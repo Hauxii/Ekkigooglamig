@@ -67,8 +67,21 @@ fd_set rfds;
 GTree *userlist;
 //static char rbuf[512];
 
+void timestamp(void* ptr){
+     struct sockaddr_in *client = (struct sockaddr_in *) ptr;
+    GDateTime *timestamp;
+    timestamp = g_date_time_new_now_local();
+    char *str = g_date_time_format(timestamp, "%x %X");
+    g_print("<%s> : %s:%d \n", str, inet_ntoa(client->sin_addr), ntohs(client->sin_port));
+    g_date_time_unref(timestamp);
+    g_free(str);
+}
 gboolean update_fd(gpointer key, gpointer user, gpointer ret){
-    int user_fd = ((struct user *) user)->conn_fd;
+    //get rid of warning
+    if(key == NULL){
+    }
+
+   int user_fd = ((struct user *) user)->conn_fd;
     int ret_fd = *(int *)ret;
     FD_SET(user_fd, &rfds);
     if(user_fd > ret_fd){
@@ -85,8 +98,10 @@ gboolean get_data_from_users(gpointer key, gpointer user, gpointer ret){
         char buffer[512] = {'\0'};
         int bytes = SSL_read(curr_user->conn_ssl, buffer, sizeof(buffer)-1);
         if(bytes <= 0){
+            printf("disconnected user: ");
+            timestamp((void*)key);
             SSL_shutdown(curr_user->conn_ssl);
-            g_tree_remove(userlist, key);            
+            g_tree_remove(userlist, key); 
         }
         else{
             buffer[bytes] = '\0';
@@ -157,7 +172,7 @@ int main(int argc, char **argv)
         timeout.tv_usec = 0;
 
         int updated_fd = -1;
-        g_tree_foreach(userlist, (gpointer)update_fd, &updated_fd);
+        g_tree_foreach(userlist, update_fd, &updated_fd);
 
         int sel = select(((updated_fd > listen_sock) ? updated_fd : listen_sock)+1,&rfds,NULL,NULL,&timeout);
 
@@ -170,14 +185,9 @@ int main(int argc, char **argv)
                 client = g_new0(struct sockaddr_in, 1);
                 socklen_t client_len = (socklen_t) sizeof(client);
                 sock = accept(listen_sock, (struct sockaddr *)client, &client_len);
-                
-                GDateTime *timestamp;
-                timestamp = g_date_time_new_now_local();
-                char *str = g_date_time_format(timestamp, "%x %X");
-                g_print("<%s> : %s:%d connected\n", str, inet_ntoa(client->sin_addr), ntohs(client->sin_port));
-                g_date_time_unref(timestamp);
-                g_free(str);
-
+               
+                printf("connect user: ");
+                timestamp((void*)client);
                 server_ssl = SSL_new(ssl_ctx);
                 if(server_ssl){
                     SSL_set_fd(server_ssl, sock);
@@ -217,7 +227,7 @@ int main(int argc, char **argv)
             printf("5 sec interval- sel was something else: %d \n", sel);
         }
 
-        g_tree_foreach(userlist, (gpointer)get_data_from_users, &rfds);
+        g_tree_foreach(userlist, get_data_from_users, &rfds);
     
 
     }

@@ -50,16 +50,11 @@ signal_handler(int signum)
 {
         int _errno = errno;
         write(STDOUT_FILENO, "err%d?",_errno);
-        if(write(exitfd[1], &signum, sizeof(signum)) == -1){
-            write(STDOUT_FILENO, "$$$$$$$$$$$$$$%d",_errno);
-        }
         if (write(exitfd[1], &signum, sizeof(signum)) == -1 && errno != EAGAIN) {
-            //write(STDOUT_FILENO, "aborting %d",5);
                         abort();
         }
         fsync(exitfd[1]);
         errno = _errno;
-        //write(STDOUT_FILENO, "ran signal handler end%d",6);
 }
 
 
@@ -155,7 +150,6 @@ void readline_callback(char *line)
         if ((strncmp("/bye", line, 4) == 0) ||
             (strncmp("/quit", line, 5) == 0)) {
                 rl_callback_handler_remove();
-                g_print("you typed /bye or /quit\n");
                 signal_handler(SIGTERM);
                 return;
         }
