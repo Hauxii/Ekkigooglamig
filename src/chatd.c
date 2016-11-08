@@ -62,7 +62,7 @@ static SSL *server_ssl;
 int main(int argc, char **argv)
 {
      struct sockaddr_in server, client;
-
+    int sock;
      int listen_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
      //CHK_ERR(listen_sock, "socket");
 
@@ -77,6 +77,8 @@ int main(int argc, char **argv)
     SSL_library_init();
     SSL_load_error_strings();
     SSL_CTX *ssl_ctx = SSL_CTX_new(TLSv1_server_method());
+    //load certificates
+    //
 
     /* núlla structið */
     memset(&server, 0, sizeof(server));
@@ -85,43 +87,61 @@ int main(int argc, char **argv)
     server.sin_port        = htons(server_port); 
 
     //TODO: error check
-    bind(listen_sock, (struct sockaddr *) &server, sizeof(server));
-
+    if(bind(listen_sock, (struct sockaddr *) &server, sizeof(server)) == -1 ){
+        printf("bind failed\n");
+    }
     //Receive a TCP connection
     //TODO: error check
-    listen(listen_sock, 5);
-    
+    if(listen(listen_sock, 5) == -1){
+        printf("listen failed");
+    }
+
 
     for(;;){
-      /* Receive and handle messages. */
-      socklen_t client_len = (socklen_t) sizeof(client);
-      int sock = accept(listen_sock, (struct sockaddr *)&client, &client_len);
+        
+        /* Receive and handle messages. */
+        socklen_t client_len = (socklen_t) sizeof(client);
+        sock = accept(listen_sock, (struct sockaddr *)&client, &client_len);
+        GDateTime *timestamp;
+        timestamp = g_date_time_new_now_local();
+        char *str = g_date_time_format(timestamp, "It is currently %x %X %z");
+        //g_print("%s\n", str);
 
-      printf("<timestamp> : %s:%d connected\n", inet_ntoa(client.sin_addr), ntohs(client.sin_port));
-      
-      server_ssl = SSL_new(ssl_ctx);
-      if(server_ssl){
-        SSL_set_fd(server_ssl, sock);
-        int err = SSL_accept(server_ssl);
-        if(err == -1){
-          printf("SSL connection failed (SSL_accept)\n");
-        } else{
-          err = SSL_write(server_ssl, "Welcome!", 8);
-          if(err == -1){
-            printf("ERROR SENDING MESSAGE\n");
-          }
+        g_print("<%s> : %s:%d connected\n", str, inet_ntoa(client.sin_addr), ntohs(client.sin_port));
+        g_date_time_unref(timestamp);
+        g_free(str);
+        server_ssl = SSL_new(ssl_ctx);
+
+        if(server_ssl){
+            printf("SSL connection using %s\n", SSL_get_cipher (server_ssl));
+            SSL_set_fd(server_ssl, sock);
+        
+            int err = SSL_accept(server_ssl);
+            if(err == -1){
+                printf("SSL connection failed (SSL_accept)\n");
+            }
+            else{
+                err = SSL_write(server_ssl, "Welcome!", strlen("Welcome!"));
+                if(err == -1){
+                    printf("ERROR SENDING MESSAGE\n");
+                }
+            }
         }
-      } else {
-        printf("SSL connection failed (SSL_new)\n");
-      }
-      
-      //SSL_set_fd(server_ssl, sock);
+        else {
+            printf("SSL connection failed (SSL_new)\n");
+        }
+        
 
-      
-      //BIO_printf(bio_c_out, "<timestamp> : %lx:%x connected\n", client.sin_addr.s_addr, client.sin_port);
+        //SSL_set_fd(server_ssl, sock);
 
+
+        //BIO_printf(bio_c_out, "<timestamp> : %lx:%x connected\n", client.sin_addr.s_addr, client.sin_port);
     }
-     
+    SSL_shutdown(server_ssl);
+    close(sock);
+    SSL_free(server_ssl);
+    SSL_CTX_free(ssl_ctx);
 
-     exit(EXIT_SUCCESS);
+
+    exit(EXIT_SUCCESS);
 }
