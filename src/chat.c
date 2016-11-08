@@ -22,8 +22,6 @@
 #include <signal.h>
 #include <arpa/inet.h>
 
-
-
 /* Secure socket layer headers */
 #include <openssl/ssl.h>
 #include <openssl/err.h>
@@ -31,6 +29,9 @@
 /* For nicer interaction, we use the GNU readline library. */
 #include <readline/readline.h>
 #include <readline/history.h>
+
+#define RSA_CLIENT_CERT "client.crt"
+#define RSA_CLIENT_KEY  "client.key"
 
 
 /* This variable holds a file descriptor of a pipe on which we send a
@@ -275,10 +276,14 @@ int main(int argc, char **argv)
 	 * a server side key data base can be used to authenticate the
 	 * client.
 	 */
-
-	server_ssl = SSL_new(ssl_ctx);
-    if(server_ssl == NULL){
-        printf("server_ssl is null\n");
+     if(SSL_CTX_use_certificate_file(ssl_ctx, RSA_CLIENT_CERT, SSL_FILETYPE_PEM) <= 0){
+      printf("error loading crt file\n");
+    }
+    if(SSL_CTX_use_PrivateKey_file(ssl_ctx, RSA_CLIENT_KEY, SSL_FILETYPE_PEM) <= 0){
+      printf("error loading key file\n");
+    }
+    if(!SSL_CTX_check_private_key(ssl_ctx)){
+      printf("key and certificate dont match\n");
     }
 
 	/* Create and set up a listening socket. The sockets you
@@ -316,6 +321,10 @@ int main(int argc, char **argv)
         printf("connection error\n");
      }
 
+     server_ssl = SSL_new(ssl_ctx);
+     if(server_ssl == NULL){
+        printf("server_ssl is null\n");
+    }
      /* Use the socket for the SSL connection. */
     SSL_set_fd(server_ssl, sock);
 
@@ -325,6 +334,12 @@ int main(int argc, char **argv)
      }
 
      printf("Connected with %s encryption\n", SSL_get_cipher(server_ssl));
+
+     X509 *server_crt;
+     server_crt = SSL_get_peer_certificate(server_ssl);
+     if(server_crt == NULL){
+        printf("Error getting server certificate/Server doesnt have certificate\n");
+     }
 
         /* Read characters from the keyboard while waiting for input.
          */
