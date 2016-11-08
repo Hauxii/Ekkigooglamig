@@ -113,10 +113,15 @@ gboolean get_data_from_users(gpointer key, gpointer user, gpointer ret){
             g_tree_remove(userlist, key); 
         }
         else{
-
-            buffer[bytes] = '\0';
-            g_tree_foreach(userlist, send_message_to_all, buffer);            
-            //printf("recieved and sent back message: %s", buffer);
+            if(buffer[0] == '/'){
+                printf("Client sent command\n");
+            }
+            else{
+                buffer[bytes] = '\0';
+                g_tree_foreach(userlist, send_message_to_all, buffer);            
+                //printf("recieved and sent back message: %s", buffer);
+            }
+            
         }
         
     }

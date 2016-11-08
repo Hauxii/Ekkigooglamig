@@ -247,7 +247,7 @@ void readline_callback(char *line)
         }
         if (strncmp("/who", line, 4) == 0) {
                 /* Query all available users */
-                return;
+                //return;
         }
         /* Sent the buffer to the server. */
         snprintf(buffer, 255, "%s", line);
