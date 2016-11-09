@@ -193,7 +193,7 @@ gboolean get_data_from_users(gpointer key, gpointer user, gpointer ret){
                     if(strncmp("anonymous", curr_user->username, 9) == 0){
                         send_message((void *)curr_user, "SERVER: Set your username with \"/user\" before sending a personal message");
                     }
-                    if(strncmp("anonymous", receiver, 9) == 0){
+                    else if(strncmp("anonymous", receiver, 9) == 0){
                         send_message((void *)curr_user, "SERVER: anonymous can not receive personal message");
                     }
                     else{
