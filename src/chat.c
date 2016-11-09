@@ -184,9 +184,9 @@ void readline_callback(char *line)
                 /* Process and send this information to the server. */
 
                 /* Maybe update the prompt. */
-                free(prompt);
-                prompt = NULL; /* What should the new prompt look like? */
-		rl_set_prompt(prompt);
+                //free(prompt);
+                //prompt = NULL; /* What should the new prompt look like? */
+		        //rl_set_prompt(prompt);
                 return;
         }
         if (strncmp("/list", line, 5) == 0) {
@@ -257,9 +257,9 @@ void readline_callback(char *line)
                 snprintf(buffer, 255, "%s", line);
                 SSL_write(server_ssl, buffer, strlen(buffer));
                 /* Maybe update the prompt. */
-                free(prompt);
-                prompt = NULL; /* What should the new prompt look like? */
-		        rl_set_prompt(prompt);
+                //free(prompt);
+                //prompt = NULL; /* What should the new prompt look like? */
+		        //rl_set_prompt(prompt);
                 return;
         }
         if (strncmp("/who", line, 4) == 0) {
