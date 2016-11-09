@@ -179,6 +179,8 @@ void readline_callback(char *line)
                         rl_redisplay();
                         return;
                 }
+                snprintf(buffer, 255, "%s", line);
+                SSL_write(server_ssl, buffer, strlen(buffer));
                 //char *chatroom = strdup(&(line[i]));
 
                 /* Process and send this information to the server. */
@@ -186,7 +188,7 @@ void readline_callback(char *line)
                 /* Maybe update the prompt. */
                 free(prompt);
                 prompt = NULL; /* What should the new prompt look like? */
-		rl_set_prompt(prompt);
+		        rl_set_prompt(prompt);
                 return;
         }
         if (strncmp("/list", line, 5) == 0) {
