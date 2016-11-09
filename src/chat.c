@@ -40,6 +40,8 @@
  * number if a signal is received. */
 static int exitfd[2];
 
+char *username;
+
 
 /* If someone kills the client, it should still clean up the readline
    library, otherwise the terminal is in a inconsistent state. The
@@ -233,21 +235,37 @@ void readline_callback(char *line)
                         rl_redisplay();
                         return;
                 }
+                int j = i;
+                while(line[j] != '\0'){
+                    if(isspace(line[j])){
+                        write(STDOUT_FILENO, "Error: no whitespace allowed in username\n", 41);
+                        fsync(STDOUT_FILENO);
+                        rl_redisplay();
+                        return;
+                    } 
+                    j++; 
+                }
                 //char *new_user = strdup(&(line[i]));
+
                // char passwd[48];
                // getpasswd("Password: ", passwd, 48);
 
                 /* Process and send this information to the server. */
-
+                username = strdup(&(line[i]));
+                snprintf(buffer, 255, "%s", line);
+                SSL_write(server_ssl, buffer, strlen(buffer));
                 /* Maybe update the prompt. */
                 free(prompt);
                 prompt = NULL; /* What should the new prompt look like? */
-		rl_set_prompt(prompt);
+		        rl_set_prompt(prompt);
                 return;
         }
         if (strncmp("/who", line, 4) == 0) {
+            //printf("/WHO\n");
                 /* Query all available users */
-                //return;
+            snprintf(buffer, 255, "%s", line);
+            SSL_write(server_ssl, buffer, strlen(buffer));
+            return;
         }
         /* Sent the buffer to the server. */
         snprintf(buffer, 255, "%s", line);
@@ -263,6 +281,9 @@ int main(int argc, char **argv)
         return -1;
     }
         initialize_exitfd();
+
+    username = "anonymous";
+
         
         /* Initialize OpenSSL */
 	SSL_library_init();

@@ -28,6 +28,7 @@
 struct user {
     int conn_fd;
     SSL *conn_ssl;
+    char *username;
 } user;
 /* This can be used to build instances of GTree that index on
    the address of a connection. */
@@ -99,6 +100,26 @@ gboolean send_message_to_all(gpointer key, gpointer user, gpointer message){
     return FALSE;
 }
 
+void send_message(void *user, char *message){
+    struct user *curr_user = (struct user *) user; 
+    printf("TO SEND: %s\n", message);
+    int err = SSL_write(curr_user->conn_ssl, message, strlen(message));
+    if(err == -1){
+        printf("ERROR SENDING MESSAGE\n");
+    }
+}
+GString * list_of_users;
+gboolean get_userlist(gpointer key, gpointer user, gpointer list){
+    struct user *curr_user = (struct user *) user;
+    GString *updated_list = (GString *)list;
+    //GString *curr_list = (GString *) list;
+    //GString name = g_string_new(curr_user->username);
+    g_string_append(updated_list, curr_user->username);
+    g_string_append(updated_list, "\n");
+    list = updated_list;
+    return FALSE;
+}
+
 gboolean get_data_from_users(gpointer key, gpointer user, gpointer ret){
     struct user *curr_user = (struct user *) user;
     fd_set *curr_rfds = (fd_set*) ret;
@@ -113,8 +134,23 @@ gboolean get_data_from_users(gpointer key, gpointer user, gpointer ret){
             g_tree_remove(userlist, key); 
         }
         else{
+            //printf("from client: %s\n", buffer);
             if(buffer[0] == '/'){
                 printf("Client sent command\n");
+                if (strncmp("/who", buffer, 4) == 0){
+                    //printf("SERVER: /who\n");
+                    list_of_users = g_string_new("List of users:\n");
+                    //g_list
+                    g_tree_foreach(userlist, get_userlist, list_of_users);
+                    printf("%s", (char *)list_of_users->str);
+                    send_message((void *)curr_user, (char *)list_of_users->str);
+                    g_string_free(list_of_users, TRUE);
+                    //send list of users to client
+                }
+                if (strncmp("/user", buffer, 5) == 0){
+                    //printf("%s\n", strdup(&(buffer[6])));
+                    curr_user->username = strdup(&(buffer[6]));
+                }
             }
             else{
                 buffer[bytes] = '\0';
@@ -192,7 +228,7 @@ int main(int argc, char **argv)
             printf(" sel was -1\n");
         }
         else if(sel > 0){
-            printf(" sel was > 0\n");
+            //printf(" sel was > 0\n");
             if(FD_ISSET(listen_sock, &rfds)){
                 client = g_new0(struct sockaddr_in, 1);
                 socklen_t client_len = (socklen_t) sizeof(client);
@@ -217,6 +253,7 @@ int main(int argc, char **argv)
                             struct user *newconnection = g_new(struct user,1);
                             newconnection->conn_ssl = server_ssl;
                             newconnection->conn_fd = sock;
+                            newconnection->username = "anonymous";
                             g_tree_insert(userlist, client, newconnection);
 
                             printf("user added with fd = %d\n", sock);
