@@ -138,6 +138,21 @@ gboolean get_userlist(gpointer key, gpointer user, gpointer list){
     return FALSE;
 }
 
+int found = 0;
+gboolean search_by_username(gpointer key, gpointer user, gpointer lookup){
+    struct user *curr_user = (struct user *) user;
+    printf("lookup before: %s\n", lookup);
+    if(strncmp(curr_user->username, lookup, strlen(lookup)) == 0){
+        //printf("USERNAME EXISTS\n");
+        found = 1;
+        //char *ret = "exists";
+        //lookup = ret;
+        //printf("lookup after:%s\n", lookup);
+        //return TRUE;
+    }
+    return FALSE;
+}
+
 gboolean get_data_from_users(gpointer key, gpointer user, gpointer ret){
     struct user *curr_user = (struct user *) user;
     fd_set *curr_rfds = (fd_set*) ret;
@@ -152,7 +167,7 @@ gboolean get_data_from_users(gpointer key, gpointer user, gpointer ret){
             g_tree_remove(userlist, key); 
         }
         else{
-            //printf("from client: %s\n", buffer);
+            printf("from client: %s\n", buffer);
             if(buffer[0] == '/'){
                 printf("Client sent command\n");
                 if (strncmp("/who", buffer, 4) == 0){
@@ -160,14 +175,52 @@ gboolean get_data_from_users(gpointer key, gpointer user, gpointer ret){
                     list_of_users = g_string_new("List of users:\n");
                     //g_list
                     g_tree_foreach(userlist, get_userlist, list_of_users);
-                    printf("%s", (char *)list_of_users->str);
+                    //printf("%s", (char *)list_of_users->str);
                     send_message((void *)curr_user, (char *)list_of_users->str);
                     g_string_free(list_of_users, TRUE);
                     //send list of users to client
                 }
                 if (strncmp("/user", buffer, 5) == 0){
                     //printf("%s\n", strdup(&(buffer[6])));
-                    curr_user->username = strdup(&(buffer[6]));
+                    char *new_username = strdup(&(buffer[6]));
+
+                    printf("username before: %s\n", new_username);
+                    g_tree_foreach(userlist, search_by_username, new_username);
+                    printf("username after: %s\n", new_username);
+
+                    if(found == 1){
+                        found = 0;
+                        send_message((void *)curr_user, "SERVER: username already exists");
+                    }
+                    else {
+                        curr_user->username = new_username;
+                        send_message((void *)curr_user, ("SERVER: your username has been set"));
+                    }
+                    
+                }
+                if (strncmp("/say", buffer, 4) == 0) {
+                    /* Skip whitespace */
+                    int i = 4;
+                    while (buffer[i] != '\0' && isspace(buffer[i])) { i++; }
+                    /* Skip whitespace */
+                    int j = i+1;
+                    while (buffer[j] != '\0' && isgraph(buffer[j])) { j++; }
+                    char *receiver = strndup(&(buffer[i]), j - i);
+                    char *message = &buffer[j];
+                    printf("receiver: %s, message: %s\n", receiver, message);
+                    if(strncmp("anonymous", curr_user->username, 9) == 0){
+                        send_message((void *)curr_user, "SERVER: Set your username with \"/user\" before sending a personal message");
+                    }
+                    else if(strncmp("anonymous", receiver, 9) == 0){
+                        send_message((void *)curr_user, "SERVER: anonymous can not receive personal message");
+                    }
+                    else{
+                        /* Send private message to receiver. */
+                        snprintf(buffer, 255, "%s: %s", curr_user->username,message);
+                        //SSL_write(server_ssl, buffer, strlen(buffer));
+                    }
+                    
+
                 }
                 //Assuming users can not be named anon when joining
                 if (strncmp("/join", buffer, 5) == 0){
