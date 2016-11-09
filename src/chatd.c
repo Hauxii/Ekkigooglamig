@@ -25,7 +25,7 @@
 #define RSA_SERVER_CERT     "server.crt"
 #define RSA_SERVER_KEY      "server.key"
 
-struct user {
+typedef struct user {
     int conn_fd;
     SSL *conn_ssl;
     char *username;
@@ -36,6 +36,10 @@ struct room {
     char *name;
     GList *members;
 } room;
+typedef struct message_with_sender {
+    char* message;
+    char* receiver;
+} message_with_sender;
 /* This can be used to build instances of GTree that index on
    the address of a connection. */
 int sockaddr_in_cmp(const void *addr1, const void *addr2)
@@ -110,9 +114,24 @@ gboolean send_message_to_all(gpointer key, gpointer user, gpointer message){
     return FALSE;
 }
 
+gboolean send_pm(gpointer key, gpointer user, gpointer message_struct){
+    //get rid of warning
+    if(key == NULL){
+    }
+    struct user *curr_user = (struct user *) user;
+    struct message_with_sender* temp = (message_with_sender *)message_struct;
+    if(strcmp(curr_user->username, temp->receiver) == 0){
+        int err = SSL_write(curr_user->conn_ssl, temp->message, strlen(temp->message));
+        if(err == -1){
+            printf("ERROR SENDING MESSAGE\n");
+        }
+        return TRUE;
+    }
+    return FALSE;
+}
+
 void send_message(void *user, char *message){
     struct user *curr_user = (struct user *) user; 
-    printf("TO SEND: %s\n", message);
     int err = SSL_write(curr_user->conn_ssl, message, strlen(message));
     if(err == -1){
         printf("ERROR SENDING MESSAGE\n");
@@ -120,6 +139,8 @@ void send_message(void *user, char *message){
 }
 
 gboolean print_room_users(gpointer username, gpointer data){
+    if(data == NULL){
+    }
     printf("%s\n", (char*)username);
     return FALSE;
 }
@@ -132,28 +153,41 @@ gboolean get_userlist(gpointer username, gpointer list){
     //GString *curr_list = (GString *) list;
     //GString name = g_string_new(curr_user->username);
     g_string_append(updated_list, (char*)username);
-    g_string_append(updated_list, "\n");
     list = updated_list;
     return FALSE;
 }
+/*
+gboolean get_userlist(gpointer key, gpointer user, gpointer list){
+    //get rid of warning
+    if(key == NULL){
+    }
+    struct user *curr_user = (struct user *) user;
+    GString *updated_list = (GString *)list;
+    g_string_append(updated_list, curr_user->username);
+    g_string_append(updated_list, "\n");
+    list = updated_list;
+    return FALSE;
+}*/
 
 int found = 0;
 gboolean search_by_username(gpointer key, gpointer user, gpointer lookup){
+    //get rid of warning
+    if(key == NULL){
+    }
     struct user *curr_user = (struct user *) user;
     printf("lookup before: %s\n", (char*)lookup);
     if(strncmp(curr_user->username, lookup, strlen(lookup)) == 0){
-        //printf("USERNAME EXISTS\n");
         found = 1;
-        //char *ret = "exists";
-        //lookup = ret;
-        //printf("lookup after:%s\n", lookup);
-        //return TRUE;
+        return TRUE;
     }
     return FALSE;
 }
 
 
 gboolean get_data_from_users(gpointer key, gpointer user, gpointer ret){
+    //get rid of warning
+    if(key == NULL){
+    }
     struct user *curr_user = (struct user *) user;
     fd_set *curr_rfds = (fd_set*) ret;
     if(FD_ISSET(curr_user->conn_fd, curr_rfds)){
@@ -167,8 +201,10 @@ gboolean get_data_from_users(gpointer key, gpointer user, gpointer ret){
             g_tree_remove(userlist, key); 
         }
         else{
-            printf("from client: %s\n", buffer);
-            if(buffer[0] == '/'){
+            if(strncmp("anonymous", curr_user->username, 9) == 0 && (strncmp("/user", buffer, 5) != 0)){
+                send_message((void *)curr_user, "SERVER: please authenticate a username with \"/user [your username]\"");
+            }
+            else if(buffer[0] == '/'){
                 printf("Client sent command\n");
                 if (strncmp("/who", buffer, 4) == 0){
 
@@ -192,14 +228,18 @@ gboolean get_data_from_users(gpointer key, gpointer user, gpointer ret){
                         g_string_free(list_of_users, TRUE);
                         //send list of users to client
                     }
-                }
+             /*       list_of_users = g_string_new("List of users:\n");
+                    g_tree_foreach(userlist, get_userlist, list_of_users);
+                    send_message((void *)curr_user, (char *)list_of_users->str);
+                    g_string_free(list_of_users, TRUE);
+             */   }
                 if (strncmp("/user", buffer, 5) == 0){
                     //printf("%s\n", strdup(&(buffer[6])));
                     char *new_username = strdup(&(buffer[6]));
 
-                    printf("username before: %s\n", new_username);
+                    //printf("username before: %s\n", new_username);
                     g_tree_foreach(userlist, search_by_username, new_username);
-                    printf("username after: %s\n", new_username);
+                    //printf("username after: %s\n", new_username);
 
                     if(found == 1){
                         found = 0;
@@ -219,18 +259,18 @@ gboolean get_data_from_users(gpointer key, gpointer user, gpointer ret){
                     int j = i+1;
                     while (buffer[j] != '\0' && isgraph(buffer[j])) { j++; }
                     char *receiver = strndup(&(buffer[i]), j - i);
-                    char *message = &buffer[j];
-                    printf("receiver: %s, message: %s\n", receiver, message);
-                    if(strncmp("anonymous", curr_user->username, 9) == 0){
-                        send_message((void *)curr_user, "SERVER: Set your username with \"/user\" before sending a personal message");
-                    }
-                    else if(strncmp("anonymous", receiver, 9) == 0){
+                    char *message = &buffer[j + 1];
+
+                    snprintf(buffer, 255, "%s: %s", curr_user->username, message);
+                    struct message_with_sender* msg_sender = g_new(struct message_with_sender, 1);
+                    msg_sender->message = buffer;
+                    msg_sender->receiver = receiver;
+
+                    if(strncmp("anonymous", msg_sender->receiver, 9) == 0){
                         send_message((void *)curr_user, "SERVER: anonymous can not receive personal message");
                     }
                     else{
-                        /* Send private message to receiver. */
-                        snprintf(buffer, 255, "%s: %s", curr_user->username,message);
-                        //SSL_write(server_ssl, buffer, strlen(buffer));
+                        g_tree_foreach(userlist, send_pm, msg_sender);
                     }
 
 
@@ -245,7 +285,7 @@ gboolean get_data_from_users(gpointer key, gpointer user, gpointer ret){
                             old_room_ptr->members = g_list_remove(old_room_ptr->members,curr_user->username);
                             curr_user->curr_room = strdup(new_room);
                         }
-                        
+
                         curr_user->curr_room = strdup(new_room);
                         result->members = g_list_prepend(result->members,curr_user->username);
                     }
@@ -259,16 +299,15 @@ gboolean get_data_from_users(gpointer key, gpointer user, gpointer ret){
                     struct room* lobby = (struct room*)g_tree_lookup(roomList,"lobby");
                     g_list_foreach (lobby->members, (GFunc)print_room_users, NULL);
 
-                }
+                }                
             }
             else{
                 buffer[bytes] = '\0';
                 g_tree_foreach(userlist, send_message_to_all, buffer);            
-                //printf("recieved and sent back message: %s", buffer);
             }
-            
+
         }
-        
+
     }
     return FALSE;
 }
@@ -360,7 +399,7 @@ int main(int argc, char **argv)
         int sel = select(((updated_fd > listen_sock) ? updated_fd : listen_sock)+1,&rfds,NULL,NULL,&timeout);
 
         if(sel == -1){
-            printf(" sel was -1\n");
+            //printf(" sel was -1\n");
         }
         else if(sel > 0){
             //printf(" sel was > 0\n");
@@ -379,6 +418,9 @@ int main(int argc, char **argv)
                         printf("SSL connection failed (SSL_accept)\n");
                     } 
                     else{
+                        char welcome[1024] = {'\0'};
+                        //snprintf(buffer, 255, "%s: %s", curr_user->username, message);
+                        snprintf(welcome, 1024, "Welcome!\nTo start using the chat you have to authenticate a username with the command \"/user [Your Username]\"\n");
                         err = SSL_write(server_ssl, "Welcome!", 8);
                         
                         if(err == -1){
@@ -392,7 +434,7 @@ int main(int argc, char **argv)
                             newconnection->curr_room = "none";
                             g_tree_insert(userlist, client, newconnection);
 
-                            printf("user added with fd = %d\n", sock);
+                            //printf("user added with fd = %d\n", sock);
 
                         }              
                     }
@@ -409,7 +451,7 @@ int main(int argc, char **argv)
         }
         else{
             //maybe check for timeouts
-           // printf("5 sec interval- sel was something else: %d \n", sel);
+            //printf("5 sec interval- sel was something else: %d \n", sel);
         }
 
         g_tree_foreach(userlist, get_data_from_users, &rfds);
