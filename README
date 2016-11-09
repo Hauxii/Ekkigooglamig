@@ -1,1 +1,10 @@
-Update this.
+Where are the passwords stored? Where are the salt strings
+stored? Why do you send the plain text password/hashed password? Can someone
+read the password in transit? What are the security implications of your decision?
+-Since we didn't implement passwords, we are not logging any passwords.
+and since we are sending everything through SSL the security should be fine
+
+Should private messages be logged? If so, what should be logged about private messages? What are the consequences of your decisions?
+-We think not, so nothing should be logged. The consequences are that the users feel safe using our chat since we are not logging their personal messages.
+
+We are using certificates without passphrases since we assume the users are on their private computer.
