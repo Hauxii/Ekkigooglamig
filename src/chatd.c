@@ -30,6 +30,7 @@ typedef struct user {
     SSL *conn_ssl;
     char *username;
     char *curr_room;
+    int timeout;
 } user;
 
 struct room {
@@ -166,6 +167,33 @@ gboolean search_by_username(gpointer key, gpointer user, gpointer lookup){
 }
 
 
+void disconnectUser(struct user* user, void* key){
+
+    printf("disconnected user: ");
+    timestamp(key);
+    if(strcmp(user->curr_room, "none") != 0){
+        struct room* room_ptr = (struct room*)g_tree_lookup(roomList,user->curr_room);
+        room_ptr->members = g_list_remove(room_ptr->members, user->username);
+    }
+    SSL_shutdown(user->conn_ssl);
+    g_tree_remove(userlist, key); 
+}
+
+gboolean check_users_timeout(gpointer key, gpointer user, gpointer maxTime){
+    struct user *curr_user = (struct user *) user;
+    int* time = (int*)maxTime;
+    curr_user->timeout += 1;
+    printf("the only user logged on has %d in timeout\n", curr_user->timeout);
+    if(curr_user->timeout == *time){
+            char* message = "You have been disconnected for inactivity :( \n";
+          int err = SSL_write(curr_user->conn_ssl, message, strlen(message));
+          if(err == -1){
+              printf("ERROR SENDING MESSAGE\n");
+          }
+        disconnectUser(curr_user, key);
+    }
+    return FALSE;
+}
 gboolean get_data_from_users(gpointer key, gpointer user, gpointer ret){
     //get rid of warning
     if(key == NULL){
@@ -177,10 +205,7 @@ gboolean get_data_from_users(gpointer key, gpointer user, gpointer ret){
         char buffer[1024] = {'\0'};
         int bytes = SSL_read(curr_user->conn_ssl, buffer, sizeof(buffer)-1);
         if(bytes <= 0){
-            printf("disconnected user: ");
-            timestamp((void*)key);
-            SSL_shutdown(curr_user->conn_ssl);
-            g_tree_remove(userlist, key); 
+            disconnectUser(curr_user, key);
         }
         else{
             if(strncmp("anonymous", curr_user->username, 9) == 0 && (strncmp("/user", buffer, 5) != 0)){
@@ -279,9 +304,9 @@ gboolean get_data_from_users(gpointer key, gpointer user, gpointer ret){
                 buffer[bytes] = '\0';
                 g_tree_foreach(userlist, send_message_to_all, buffer);            
             }
-
+            //User did something so we reset timeout
+            curr_user->timeout = 0;
         }
-
     }
     return FALSE;
 }
@@ -290,7 +315,7 @@ int main(int argc, char **argv)
 {
     struct sockaddr_in server, *client;
     int listen_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-
+    int maxTimeOut = 10;
     if (argc != 2) {
         fprintf(stderr, "Usage: %s <port>\n", argv[0]);
         exit(EXIT_FAILURE);
@@ -386,6 +411,7 @@ int main(int argc, char **argv)
                             newconnection->conn_fd = sock;
                             newconnection->username = "anonymous";
                             newconnection->curr_room = "none";
+                            newconnection->timeout = 0;
                             g_tree_insert(userlist, client, newconnection);
                         }              
                     }
@@ -399,6 +425,9 @@ int main(int argc, char **argv)
         else{
             //maybe check for timeouts
             //printf("5 sec interval- sel was something else: %d \n", sel);
+            int* ptr = &maxTimeOut; 
+            g_tree_foreach(userlist, check_users_timeout, ptr);
+        
         }
 
         g_tree_foreach(userlist, get_data_from_users, &rfds);
