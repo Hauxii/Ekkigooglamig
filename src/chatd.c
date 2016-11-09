@@ -147,6 +147,19 @@ GString * list_of_users;
 gboolean get_userlist(gpointer username, gpointer list){    
     GString *updated_list = (GString *)list;
     g_string_append(updated_list, (char*)username);
+    g_string_append(updated_list, "\n");
+    list = updated_list;
+    return FALSE;
+}
+
+GString * list_of_chatrooms;
+gboolean get_chatroomlist(gpointer key, gpointer chatroom, gpointer list){
+    if(key == NULL){
+    }    
+    GString *updated_list = (GString *)list;
+    struct room* temp = (struct room *)chatroom;
+    g_string_append(updated_list, temp->name);
+    g_string_append(updated_list, "\n");
     list = updated_list;
     return FALSE;
 }
@@ -157,7 +170,6 @@ gboolean search_by_username(gpointer key, gpointer user, gpointer lookup){
     if(key == NULL){
     }
     struct user *curr_user = (struct user *) user;
-    printf("lookup before: %s\n", (char*)lookup);
     if(strncmp(curr_user->username, lookup, strlen(lookup)) == 0){
         found = 1;
         return TRUE;
@@ -188,6 +200,7 @@ gboolean get_data_from_users(gpointer key, gpointer user, gpointer ret){
             }
             else if(buffer[0] == '/'){
                 printf("Client sent command\n");
+                printf("from client: %s\n", buffer);
                 if (strncmp("/who", buffer, 4) == 0){
 
                     //TODO if there is something after who it should says wrong command
@@ -199,13 +212,20 @@ gboolean get_data_from_users(gpointer key, gpointer user, gpointer ret){
                     }
                     else{
                         struct room* result = (struct room*)g_tree_lookup(roomList,curr_user->curr_room);
-                        list_of_users = g_string_new("List of users in same room as you: ");
+                        list_of_users = g_string_new("List of users in same room as you: \n");
                         //TODO add the room name to this string
                         
                         g_list_foreach (result->members, (GFunc)get_userlist, list_of_users);
                         send_message((void *)curr_user, (char *)list_of_users->str);
                         g_string_free(list_of_users, TRUE);
                     }
+                }
+                if (strncmp("/list", buffer, 5) == 0){
+                    printf("list\n");
+                    list_of_chatrooms = g_string_new("List of available chatrooms: \n");
+                    g_tree_foreach(roomList, get_chatroomlist, list_of_chatrooms);
+                    send_message((void * )curr_user, (char *)list_of_chatrooms->str);
+                    g_string_free(list_of_chatrooms, TRUE);
                 }
                 if (strncmp("/user", buffer, 5) == 0){
                     char *new_username = strdup(&(buffer[6]));
@@ -246,7 +266,7 @@ gboolean get_data_from_users(gpointer key, gpointer user, gpointer ret){
                 }
                 if (strncmp("/help", buffer, 5) == 0){
                     char help[1024];
-                    snprintf(help, 1024, "\"/user [Your Username]\" - registers you as a user\n\"/who\" - lists all users online\n\"/say [Username]\" - sends a personal message to another user\n\"/join [Chatroom]\" - lets you join a chatroom\n");
+                    snprintf(help, 1024, "\"/user [Your Username]\" - registers you as a user\n\"/who\" - lists all users online\n\"/say [Username]\" - sends a personal message to another user\n\"/join [Chatroom]\" - lets you join a chatroom\n\"/list\" - lists all available chatrooms");
                     send_message((void *)curr_user, help);
                 }
                 //Assuming users can not be named anon when joining

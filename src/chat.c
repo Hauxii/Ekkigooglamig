@@ -179,6 +179,15 @@ void readline_callback(char *line)
         }
         if (strncmp("/list", line, 5) == 0) {
                 /* Query all available chat rooms */
+                if(line[6] != '\0'){
+                    write(STDOUT_FILENO, "Usage: /list\n",
+                          29);
+                    fsync(STDOUT_FILENO);
+                    rl_redisplay();
+                    return;
+                }
+                snprintf(buffer, 255, "%s", line);
+                SSL_write(server_ssl, buffer, strlen(buffer));
                 return;
         }
         if (strncmp("/roll", line, 5) == 0) {
