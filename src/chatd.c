@@ -33,14 +33,16 @@ typedef struct user {
     int timeout;
 } user;
 
-struct room {
+typedef struct room {
     char *name;
     GList *members;
 } room;
-typedef struct message_with_sender {
+typedef struct message_with_info {
     char* message;
-    char* receiver;
-} message_with_sender;
+    char* info;
+} message_with_info;
+
+
 /* This can be used to build instances of GTree that index on
    the address of a connection. */
 int sockaddr_in_cmp(const void *addr1, const void *addr2)
@@ -106,9 +108,12 @@ gboolean send_message_to_all(gpointer key, gpointer user, gpointer message){
     if(key == NULL){
     }
     struct user *curr_user = (struct user *) user;
-    int err = SSL_write(curr_user->conn_ssl, message, strlen(message));
-    if(err == -1){
-        printf("ERROR SENDING MESSAGE\n");
+    struct message_with_info* msg = (struct message_with_info*) message;
+    if(strcmp(msg->info,curr_user->curr_room) == 0){
+        int err = SSL_write(curr_user->conn_ssl, msg->message, strlen(msg->message));
+        if(err == -1){
+            printf("ERROR SENDING MESSAGE\n");
+        }
     }
     return FALSE;
 }
@@ -118,8 +123,8 @@ gboolean send_pm(gpointer key, gpointer user, gpointer message_struct){
     if(key == NULL){
     }
     struct user *curr_user = (struct user *) user;
-    struct message_with_sender* temp = (message_with_sender *)message_struct;
-    if(strcmp(curr_user->username, temp->receiver) == 0){
+    struct message_with_info* temp = (message_with_info *)message_struct;
+    if(strcmp(curr_user->username, temp->info) == 0){
         int err = SSL_write(curr_user->conn_ssl, temp->message, strlen(temp->message));
         if(err == -1){
             printf("ERROR SENDING MESSAGE\n");
@@ -276,11 +281,11 @@ gboolean get_data_from_users(gpointer key, gpointer user, gpointer ret){
                     char *message = &buffer[j + 1];
 
                     snprintf(buffer, 255, "%s: %s", curr_user->username, message);
-                    struct message_with_sender* msg_sender = g_new(struct message_with_sender, 1);
+                    struct message_with_info* msg_sender = g_new(struct message_with_info, 1);
                     msg_sender->message = buffer;
-                    msg_sender->receiver = receiver;
+                    msg_sender->info = receiver;
 
-                    if(strncmp("anonymous", msg_sender->receiver, 9) == 0){
+                    if(strncmp("anonymous", msg_sender->info, 9) == 0){
                         send_message((void *)curr_user, "SERVER: anonymous can not receive personal message");
                     }
                     else{
@@ -321,8 +326,20 @@ gboolean get_data_from_users(gpointer key, gpointer user, gpointer ret){
                 }                
             }
             else{
-                buffer[bytes] = '\0';
-                g_tree_foreach(userlist, send_message_to_all, buffer);            
+                if(strcmp(curr_user->curr_room, "none") == 0){
+                    
+                        send_message((void *)curr_user, ("SERVER: You have to join a room to be able to chat. Use /help to see a list of command to do so."));
+                }
+                else{
+                    //send message to people in room;
+                    struct message_with_info* msg = g_new(struct message_with_info,1);
+                    buffer[bytes] = '\0';
+
+                    msg->message = buffer;
+                    msg->info = curr_user->curr_room;
+                    g_tree_foreach(userlist, send_message_to_all, msg);            
+                    g_free(msg);
+                }
             }
             //User did something so we reset timeout
             curr_user->timeout = 0;
