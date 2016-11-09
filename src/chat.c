@@ -116,17 +116,6 @@ static void initialize_exitfd(void)
 //static int server_fd;
 static SSL *server_ssl;
 
-
-/* This variable shall point to the name of the user. The initial value
-   is NULL. Set this variable to the username once the user managed to be
-   authenticated. */
-//static char *user;
-
-/* This variable shall point to the name of the chatroom. The initial
-   value is NULL (not member of a chat room). Set this variable whenever
-   the user changed the chat room successfully. */
-//static char *chatroom;
-
 /* This prompt is used by the readline library to ask the user for
  * input. It is good style to indicate the name of the user and the
  * chat room he is in as part of the prompt. */
@@ -181,9 +170,6 @@ void readline_callback(char *line)
                 }
                 snprintf(buffer, 255, "%s", line);
                 SSL_write(server_ssl, buffer, strlen(buffer));
-                //char *chatroom = strdup(&(line[i]));
-
-                /* Process and send this information to the server. */
 
                 /* Maybe update the prompt. */
                 //free(prompt);
@@ -220,8 +206,6 @@ void readline_callback(char *line)
                         rl_redisplay();
                         return;
                 }
-                //char *receiver = strndup(&(line[i]), j - i - 1);
-                //char *message = strndup(&(line[j]), j - i - 1);
 
                 /* Send private message to receiver. */
                 snprintf(buffer, 255, "%s", line);
@@ -249,10 +233,6 @@ void readline_callback(char *line)
                     } 
                     j++; 
                 }
-                //char *new_user = strdup(&(line[i]));
-
-               // char passwd[48];
-               // getpasswd("Password: ", passwd, 48);
 
                 /* Process and send this information to the server. */
                 username = strdup(&(line[i]));
@@ -265,16 +245,13 @@ void readline_callback(char *line)
                 return;
         }
         if (strncmp("/who", line, 4) == 0) {
-            //printf("/WHO\n");
-                /* Query all available users */
+            /* Query all available users */
             snprintf(buffer, 255, "%s", line);
             SSL_write(server_ssl, buffer, strlen(buffer));
             return;
         }
         /* Sent the buffer to the server. */
         snprintf(buffer, 255, "%s", line);
-        //write(STDOUT_FILENO, buffer, strlen(buffer));
-        //fsync(STDOUT_FILENO);
         SSL_write(server_ssl, buffer, strlen(buffer));
 }
 
@@ -289,7 +266,7 @@ int main(int argc, char **argv)
     username = "anonymous";
 
         
-        /* Initialize OpenSSL */
+    /* Initialize OpenSSL */
 	SSL_library_init();
 	SSL_load_error_strings();
 	SSL_CTX *ssl_ctx = SSL_CTX_new(TLSv1_client_method());
@@ -297,14 +274,8 @@ int main(int argc, char **argv)
         printf("failed to set ssl_ctx\n");
     }
 
-	/* TODO:
-	 * We may want to use a certificate file if we self sign the
-	 * certificates using SSL_use_certificate_file(). If available,
-	 * a private key can be loaded using
-	 * SSL_CTX_use_PrivateKey_file(). The use of private keys with
-	 * a server side key data base can be used to authenticate the
-	 * client.
-	 */
+
+    /* Load certificates */
      if(SSL_CTX_use_certificate_file(ssl_ctx, RSA_CLIENT_CERT, SSL_FILETYPE_PEM) <= 0){
       printf("error loading crt file\n");
     }
@@ -315,19 +286,6 @@ int main(int argc, char **argv)
       printf("key and certificate dont match\n");
     }
 
-	/* Create and set up a listening socket. The sockets you
-	 * create here can be used in select calls, so do not forget
-	 * them.
-	 */
-
-	
-
-	/* Now we can create BIOs and use them instead of the socket.
-	 * The BIO is responsible for maintaining the state of the
-	 * encrypted connection and the actual encryption. Reads and
-	 * writes to sock_fd will insert unencrypted data into the
-	 * stream, which even may crash the server.
-	 */
 
      char msg[1024]; //2048
 
@@ -338,7 +296,6 @@ int main(int argc, char **argv)
         printf("sock error\n");
      }
      const int server_port = strtol(argv[2], NULL, 10);
-     //TODO: check error
      
      memset (&server_addr, '\0', sizeof(server_addr));
      server_addr.sin_family      = AF_INET;
@@ -379,9 +336,6 @@ int main(int argc, char **argv)
             fd_set rfds;
 	       struct timeval timeout;
 
-                /* You must change this. Keep exitfd[0] in the read set to
-                   receive the message from the signal handler. Otherwise,
-                   the chat client can break in terrible ways. */
                 FD_ZERO(&rfds);
                 FD_SET(STDIN_FILENO, &rfds);
                 FD_SET(exitfd[0], &rfds);
@@ -401,14 +355,6 @@ int main(int argc, char **argv)
                         perror("select()");
                         break;
                 }
-                /*if (r == 0) {
-                        write(STDOUT_FILENO, "No message?\n", 12);
-                        fsync(STDOUT_FILENO);
-                        // Whenever you print out a message, call this
-                        //   to reprint the current input line. 
-			             rl_redisplay();
-                        continue;
-                }*/
                 if (FD_ISSET(exitfd[0], &rfds)) {
                         /* We received a signal. */
                         int signum;
@@ -448,18 +394,10 @@ int main(int argc, char **argv)
                     }
 
                     msg[length] = '\0';
-                    //write(STDOUT_FILENO, msg, strlen(msg));
                     printf("%s\n", msg);
-                    //char rbuf[50] = {'a'};
-                    //int bytes = SSL_read(server_ssl, rbuf, sizeof(rbuf));
-                    //rbuf[bytes] = 0;
-                    //printf("%s\n", rbuf);
                 }
                 
         }
-        
-        /* replace by code to shutdown the connection and exit
-           the program. */
         SSL_shutdown(server_ssl);
         close(sock);
         SSL_free(server_ssl);
