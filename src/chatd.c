@@ -71,13 +71,11 @@ gint fd_cmp(gconstpointer fd1,  gconstpointer fd2, gpointer G_GNUC_UNUSED data)
     return GPOINTER_TO_INT(fd1) - GPOINTER_TO_INT(fd2);
 }
 
-//static int server_fd;
 static SSL *server_ssl;
 int sock;
 fd_set rfds;
 GTree *userlist;
 GTree *roomList;
-//static char rbuf[512];
 
 void timestamp(void* ptr){
      struct sockaddr_in *client = (struct sockaddr_in *) ptr;
@@ -146,28 +144,12 @@ gboolean print_room_users(gpointer username, gpointer data){
 }
 
 GString * list_of_users;
-gboolean get_userlist(gpointer username, gpointer list){
-    
-    //struct user *curr_user = (struct user *) user;
+gboolean get_userlist(gpointer username, gpointer list){    
     GString *updated_list = (GString *)list;
-    //GString *curr_list = (GString *) list;
-    //GString name = g_string_new(curr_user->username);
     g_string_append(updated_list, (char*)username);
     list = updated_list;
     return FALSE;
 }
-/*
-gboolean get_userlist(gpointer key, gpointer user, gpointer list){
-    //get rid of warning
-    if(key == NULL){
-    }
-    struct user *curr_user = (struct user *) user;
-    GString *updated_list = (GString *)list;
-    g_string_append(updated_list, curr_user->username);
-    g_string_append(updated_list, "\n");
-    list = updated_list;
-    return FALSE;
-}*/
 
 int found = 0;
 gboolean search_by_username(gpointer key, gpointer user, gpointer lookup){
@@ -221,26 +203,13 @@ gboolean get_data_from_users(gpointer key, gpointer user, gpointer ret){
                         //TODO add the room name to this string
                         
                         g_list_foreach (result->members, (GFunc)get_userlist, list_of_users);
-                        //g_list
-                        //g_tree_foreach(userlist, get_userlist, list_of_users);
-                        //printf("%s", (char *)list_of_users->str);
                         send_message((void *)curr_user, (char *)list_of_users->str);
                         g_string_free(list_of_users, TRUE);
-                        //send list of users to client
                     }
-             /*       list_of_users = g_string_new("List of users:\n");
-                    g_tree_foreach(userlist, get_userlist, list_of_users);
-                    send_message((void *)curr_user, (char *)list_of_users->str);
-                    g_string_free(list_of_users, TRUE);
-             */   }
+                }
                 if (strncmp("/user", buffer, 5) == 0){
-                    //printf("%s\n", strdup(&(buffer[6])));
                     char *new_username = strdup(&(buffer[6]));
-
-                    //printf("username before: %s\n", new_username);
                     g_tree_foreach(userlist, search_by_username, new_username);
-                    //printf("username after: %s\n", new_username);
-
                     if(found == 1){
                         found = 0;
                         send_message((void *)curr_user, "SERVER: username already exists");
@@ -321,7 +290,6 @@ int main(int argc, char **argv)
 {
     struct sockaddr_in server, *client;
     int listen_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    //CHK_ERR(listen_sock, "socket");
 
     if (argc != 2) {
         fprintf(stderr, "Usage: %s <port>\n", argv[0]);
@@ -353,12 +321,10 @@ int main(int argc, char **argv)
     server.sin_addr.s_addr = htonl(INADDR_ANY);
     server.sin_port        = htons(server_port); 
 
-    //TODO: error check
     if(bind(listen_sock, (struct sockaddr *) &server, sizeof(server)) == -1 ){
         printf("bind failed\n");
     }
     //Receive a TCP connection
-    //TODO: error check
     if(listen(listen_sock, 5) == -1){
         printf("listen failed");
     }
@@ -377,20 +343,6 @@ int main(int argc, char **argv)
     //struct room* result = (struct room*)g_tree_lookup(roomList,"lobby");
     //struct room* party = (struct room*)g_tree_lookup(roomList,"party");
     
-   /* if(result != NULL && party != NULL){
-        printf("found both rooms\n");
-        lobby->members = g_list_prepend(result->members,"Hauxi");
-        party->members = g_list_prepend(party->members,"Villiafro");
-        printf("people inside party:\n");
-        struct room* party  = (struct room*)g_tree_lookup(roomList,"party");
-        g_list_foreach (party->members, (GFunc)print_room_users, NULL);
-        printf("people inside lobby:\n");
-        struct room* lobbyy = (struct room*)g_tree_lookup(roomList,"lobby");
-        g_list_foreach (lobbyy->members, (GFunc)print_room_users, NULL);
-    }
-    else{
-        printf("result was null\n");
-    }*/
     for(;;){
         struct timeval timeout;
         FD_ZERO(&rfds);
@@ -404,10 +356,8 @@ int main(int argc, char **argv)
         int sel = select(((updated_fd > listen_sock) ? updated_fd : listen_sock)+1,&rfds,NULL,NULL,&timeout);
 
         if(sel == -1){
-            //printf(" sel was -1\n");
         }
         else if(sel > 0){
-            //printf(" sel was > 0\n");
             if(FD_ISSET(listen_sock, &rfds)){
                 client = g_new0(struct sockaddr_in, 1);
                 socklen_t client_len = (socklen_t) sizeof(client);
@@ -424,7 +374,6 @@ int main(int argc, char **argv)
                     } 
                     else{
                         char welcome[1024] = {'\0'};
-                        //snprintf(buffer, 255, "%s: %s", curr_user->username, message);
                         snprintf(welcome, 1024, "Welcome!\nTo start using the chat you have to authenticate a username with the command \"/user [Your Username]\"\nType \"/help\" to get a list of commands");
                         err = SSL_write(server_ssl, welcome, sizeof(welcome)-1);
                         
@@ -438,9 +387,6 @@ int main(int argc, char **argv)
                             newconnection->username = "anonymous";
                             newconnection->curr_room = "none";
                             g_tree_insert(userlist, client, newconnection);
-
-                            //printf("user added with fd = %d\n", sock);
-
                         }              
                     }
                 } 
@@ -449,10 +395,6 @@ int main(int argc, char **argv)
                 }
             }
             //check for new message requests
-
-            //gtree foreach
-
-
         }
         else{
             //maybe check for timeouts
