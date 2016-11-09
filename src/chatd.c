@@ -143,13 +143,6 @@ void send_message(void *user, char *message){
     }
 }
 
-gboolean print_room_users(gpointer username, gpointer data){
-    if(data == NULL){
-    }
-    printf("%s\n", (char*)username);
-    return FALSE;
-}
-
 GString * list_of_users;
 gboolean get_userlist(gpointer username, gpointer list){    
     GString *updated_list = (GString *)list;
@@ -201,9 +194,9 @@ gboolean check_users_timeout(gpointer key, gpointer user, gpointer maxTime){
     struct user *curr_user = (struct user *) user;
     int* time = (int*)maxTime;
     curr_user->timeout += 1;
-    printf("the only user logged on has %d in timeout\n", curr_user->timeout);
     if(curr_user->timeout == *time){
             char* message = "You have been disconnected for inactivity :( \n";
+            printf("timed out\n");
           int err = SSL_write(curr_user->conn_ssl, message, strlen(message));
           if(err == -1){
               printf("ERROR SENDING MESSAGE\n");
@@ -219,7 +212,6 @@ gboolean get_data_from_users(gpointer key, gpointer user, gpointer ret){
     struct user *curr_user = (struct user *) user;
     fd_set *curr_rfds = (fd_set*) ret;
     if(FD_ISSET(curr_user->conn_fd, curr_rfds)){
-        //printf("Tried to read message from user\n");
         char buffer[1024] = {'\0'};
         int bytes = SSL_read(curr_user->conn_ssl, buffer, sizeof(buffer)-1);
         if(bytes <= 0){
@@ -231,13 +223,10 @@ gboolean get_data_from_users(gpointer key, gpointer user, gpointer ret){
             }
             else if(buffer[0] == '/'){
                 if (strncmp("/who", buffer, 4) == 0){
-
-                    //TODO if there is something after who it should says wrong command
-                    //printf("SERVER: /who\n");
-                    printf("curr user room is: %s\n",curr_user->curr_room);
                     if(strcmp(curr_user->curr_room,"none") == 0){
                         //TODO tell user he should join room first
-                        printf("server logging that user sohuld be on room before whoing\n");
+                        send_message((void *)curr_user, "SERVER: You have too be in a chatroom to use \"/who\"");
+                        
                     }
                     else{
                         struct room* result = (struct room*)g_tree_lookup(roomList,curr_user->curr_room);
@@ -250,7 +239,6 @@ gboolean get_data_from_users(gpointer key, gpointer user, gpointer ret){
                     }
                 }
                 if (strncmp("/list", buffer, 5) == 0){
-                    printf("list\n");
                     list_of_chatrooms = g_string_new("List of available chatrooms: \n");
                     g_tree_foreach(roomList, get_chatroomlist, list_of_chatrooms);
                     send_message((void * )curr_user, (char *)list_of_chatrooms->str);
@@ -284,7 +272,6 @@ gboolean get_data_from_users(gpointer key, gpointer user, gpointer ret){
                     char *str = g_date_time_format(timestamp, "%x %X");
 
                     char temp[256];
-                    snprintf(temp, 255, "<%s> %s: ", str, curr_user->username);
                     GString *msg = g_string_new("");
 
                     g_string_append(msg, temp);
@@ -294,10 +281,19 @@ gboolean get_data_from_users(gpointer key, gpointer user, gpointer ret){
                     msg_sender->message = (char *)msg->str;
                     msg_sender->info = receiver;
 
+                    g_tree_foreach(userlist, search_by_username, receiver);
+
                     if(strncmp("anonymous", msg_sender->info, 9) == 0){
                         send_message((void *)curr_user, "SERVER: anonymous can not receive personal message");
                     }
+                    else if(found == 0){
+                        send_message((void *)curr_user, "SERVER: There is no user registered with that name");
+                    }
+                    else if(strcmp(receiver, curr_user->username) == 0){
+                        send_message((void *)curr_user, "SERVER: You can not send yourself a private message (cuz FUCK YOU! thats why!)");
+                    }
                     else{
+                        found = 0;
                         g_tree_foreach(userlist, send_pm, msg_sender);
                     }
 
@@ -326,15 +322,8 @@ gboolean get_data_from_users(gpointer key, gpointer user, gpointer ret){
                         result->members = g_list_prepend(result->members,curr_user->username);
                     }
                     else{
-                        printf("user tried to get into room that does not exist, you should send him a message telling him so\n");
+                        send_message((void *)curr_user, "SERVER: This room does not exist, use \"/list\" to see available rooms");
                     }
-                    printf("people inside party:\n");
-                    struct room* party  = (struct room*)g_tree_lookup(roomList,"party");
-                    g_list_foreach (party->members, (GFunc)print_room_users, NULL);
-                    printf("people inside lobby:\n");
-                    struct room* lobby = (struct room*)g_tree_lookup(roomList,"lobby");
-                    g_list_foreach (lobby->members, (GFunc)print_room_users, NULL);
-
                 }                
             }
             else{
@@ -344,13 +333,28 @@ gboolean get_data_from_users(gpointer key, gpointer user, gpointer ret){
                 }
                 else{
                     //send message to people in room;
+                    GDateTime *timestamp;
+                    timestamp = g_date_time_new_now_local();
+                    char *str = g_date_time_format(timestamp, "%x %X");
+
+                    char temp[256];
+                    snprintf(temp, 255, "<%s> %s: ", str, curr_user->username);
+                    GString *msg_temp = g_string_new("");
+
+                    g_string_append(msg_temp, temp);
+                    g_string_append(msg_temp, buffer);
+
                     struct message_with_info* msg = g_new(struct message_with_info,1);
                     buffer[bytes] = '\0';
 
-                    msg->message = buffer;
+                    msg->message = (char *)msg_temp->str;
                     msg->info = curr_user->curr_room;
+
                     g_tree_foreach(userlist, send_message_to_all, msg);            
                     g_free(msg);
+                    g_date_time_unref(timestamp);
+                    g_free(str);
+                    g_string_free(msg_temp, TRUE);
                 }
             }
             //User did something so we reset timeout
@@ -472,8 +476,6 @@ int main(int argc, char **argv)
             //check for new message requests
         }
         else{
-            //maybe check for timeouts
-            //printf("5 sec interval- sel was something else: %d \n", sel);
             int* ptr = &maxTimeOut; 
             g_tree_foreach(userlist, check_users_timeout, ptr);
         
