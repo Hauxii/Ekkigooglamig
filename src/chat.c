@@ -179,6 +179,8 @@ void readline_callback(char *line)
                         rl_redisplay();
                         return;
                 }
+                snprintf(buffer, 255, "%s", line);
+                SSL_write(server_ssl, buffer, strlen(buffer));
                 //char *chatroom = strdup(&(line[i]));
 
                 /* Process and send this information to the server. */

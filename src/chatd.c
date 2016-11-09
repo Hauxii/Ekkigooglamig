@@ -29,8 +29,13 @@ typedef struct user {
     int conn_fd;
     SSL *conn_ssl;
     char *username;
+    char *curr_room;
 } user;
 
+struct room {
+    char *name;
+    GList *members;
+} room;
 typedef struct message_with_sender {
     char* message;
     char* receiver;
@@ -71,6 +76,7 @@ static SSL *server_ssl;
 int sock;
 fd_set rfds;
 GTree *userlist;
+GTree *roomList;
 //static char rbuf[512];
 
 void timestamp(void* ptr){
@@ -132,7 +138,25 @@ void send_message(void *user, char *message){
     }
 }
 
+gboolean print_room_users(gpointer username, gpointer data){
+    if(data == NULL){
+    }
+    printf("%s\n", (char*)username);
+    return FALSE;
+}
+
 GString * list_of_users;
+gboolean get_userlist(gpointer username, gpointer list){
+    
+    //struct user *curr_user = (struct user *) user;
+    GString *updated_list = (GString *)list;
+    //GString *curr_list = (GString *) list;
+    //GString name = g_string_new(curr_user->username);
+    g_string_append(updated_list, (char*)username);
+    list = updated_list;
+    return FALSE;
+}
+/*
 gboolean get_userlist(gpointer key, gpointer user, gpointer list){
     //get rid of warning
     if(key == NULL){
@@ -143,7 +167,7 @@ gboolean get_userlist(gpointer key, gpointer user, gpointer list){
     g_string_append(updated_list, "\n");
     list = updated_list;
     return FALSE;
-}
+}*/
 
 int found = 0;
 gboolean search_by_username(gpointer key, gpointer user, gpointer lookup){
@@ -151,12 +175,14 @@ gboolean search_by_username(gpointer key, gpointer user, gpointer lookup){
     if(key == NULL){
     }
     struct user *curr_user = (struct user *) user;
+    printf("lookup before: %s\n", (char*)lookup);
     if(strncmp(curr_user->username, lookup, strlen(lookup)) == 0){
         found = 1;
         return TRUE;
     }
     return FALSE;
 }
+
 
 gboolean get_data_from_users(gpointer key, gpointer user, gpointer ret){
     //get rid of warning
@@ -181,11 +207,32 @@ gboolean get_data_from_users(gpointer key, gpointer user, gpointer ret){
             else if(buffer[0] == '/'){
                 printf("Client sent command\n");
                 if (strncmp("/who", buffer, 4) == 0){
-                    list_of_users = g_string_new("List of users:\n");
+
+                    //TODO if there is something after who it should says wrong command
+                    //printf("SERVER: /who\n");
+                    printf("curr user room is: %s\n",curr_user->curr_room);
+                    if(strcmp(curr_user->curr_room,"none") == 0){
+                        //TODO tell user he should join room first
+                        printf("server logging that user sohuld be on room before whoing\n");
+                    }
+                    else{
+                        struct room* result = (struct room*)g_tree_lookup(roomList,curr_user->curr_room);
+                        list_of_users = g_string_new("List of users in same room as you: ");
+                        //TODO add the room name to this string
+                        
+                        g_list_foreach (result->members, (GFunc)get_userlist, list_of_users);
+                        //g_list
+                        //g_tree_foreach(userlist, get_userlist, list_of_users);
+                        //printf("%s", (char *)list_of_users->str);
+                        send_message((void *)curr_user, (char *)list_of_users->str);
+                        g_string_free(list_of_users, TRUE);
+                        //send list of users to client
+                    }
+             /*       list_of_users = g_string_new("List of users:\n");
                     g_tree_foreach(userlist, get_userlist, list_of_users);
                     send_message((void *)curr_user, (char *)list_of_users->str);
                     g_string_free(list_of_users, TRUE);
-                }
+             */   }
                 if (strncmp("/user", buffer, 5) == 0){
                     //printf("%s\n", strdup(&(buffer[6])));
                     char *new_username = strdup(&(buffer[6]));
@@ -202,7 +249,7 @@ gboolean get_data_from_users(gpointer key, gpointer user, gpointer ret){
                         curr_user->username = new_username;
                         send_message((void *)curr_user, ("SERVER: your username has been set"));
                     }
-                    
+
                 }
                 if (strncmp("/say", buffer, 4) == 0) {
                     /* Skip whitespace */
@@ -218,27 +265,54 @@ gboolean get_data_from_users(gpointer key, gpointer user, gpointer ret){
                     struct message_with_sender* msg_sender = g_new(struct message_with_sender, 1);
                     msg_sender->message = buffer;
                     msg_sender->receiver = receiver;
-                    
+
                     if(strncmp("anonymous", msg_sender->receiver, 9) == 0){
                         send_message((void *)curr_user, "SERVER: anonymous can not receive personal message");
                     }
                     else{
                         g_tree_foreach(userlist, send_pm, msg_sender);
-                    } 
+                    }
+
+
                 }
                 if (strncmp("/help", buffer, 5) == 0){
                     char help[1024];
                     snprintf(help, 1024, "\"/user [Your Username]\" - registers you as a user\n\"/who\" - lists all users online\n\"/say [Username]\" - sends a personal message to another user\n\"/join [Chatroom]\" - lets you join a chatroom\n");
-                    send_message((void *)curr_user, &help);
+                    send_message((void *)curr_user, help);
                 }
+                //Assuming users can not be named anon when joining
+                if (strncmp("/join", buffer, 5) == 0){
+                    char *new_room = strdup(&(buffer[6]));
+                    struct room* result = (struct room*)g_tree_lookup(roomList,new_room);
+                    if(result != NULL){
+                        if(strcmp(curr_user->curr_room,"none") != 0){
+                            struct room* old_room_ptr = (struct room*)g_tree_lookup(roomList,curr_user->curr_room);
+                            old_room_ptr->members = g_list_remove(old_room_ptr->members,curr_user->username);
+                            curr_user->curr_room = strdup(new_room);
+                        }
+
+                        curr_user->curr_room = strdup(new_room);
+                        result->members = g_list_prepend(result->members,curr_user->username);
+                    }
+                    else{
+                        printf("user tried to get into room that does not exist, you should send him a message telling him so\n");
+                    }
+                    printf("people inside party:\n");
+                    struct room* party  = (struct room*)g_tree_lookup(roomList,"party");
+                    g_list_foreach (party->members, (GFunc)print_room_users, NULL);
+                    printf("people inside lobby:\n");
+                    struct room* lobby = (struct room*)g_tree_lookup(roomList,"lobby");
+                    g_list_foreach (lobby->members, (GFunc)print_room_users, NULL);
+
+                }                
             }
             else{
                 buffer[bytes] = '\0';
                 g_tree_foreach(userlist, send_message_to_all, buffer);            
             }
-            
+
         }
-        
+
     }
     return FALSE;
 }
@@ -290,7 +364,33 @@ int main(int argc, char **argv)
     }
 
     userlist = g_tree_new(sockaddr_in_cmp);
-
+    roomList = g_tree_new((GCompareFunc)strcmp);
+    //initialize a couple of rooms for now
+    struct room* lobby = g_new(struct room,1);
+    lobby->name = "lobby";
+    lobby->members = NULL;
+    struct room* nextRoom = g_new(struct room,1);
+    nextRoom->name = "party";
+    nextRoom->members = NULL;
+    g_tree_insert(roomList, lobby->name, lobby);
+    g_tree_insert(roomList, nextRoom->name, nextRoom);
+    //struct room* result = (struct room*)g_tree_lookup(roomList,"lobby");
+    //struct room* party = (struct room*)g_tree_lookup(roomList,"party");
+    
+   /* if(result != NULL && party != NULL){
+        printf("found both rooms\n");
+        lobby->members = g_list_prepend(result->members,"Hauxi");
+        party->members = g_list_prepend(party->members,"Villiafro");
+        printf("people inside party:\n");
+        struct room* party  = (struct room*)g_tree_lookup(roomList,"party");
+        g_list_foreach (party->members, (GFunc)print_room_users, NULL);
+        printf("people inside lobby:\n");
+        struct room* lobbyy = (struct room*)g_tree_lookup(roomList,"lobby");
+        g_list_foreach (lobbyy->members, (GFunc)print_room_users, NULL);
+    }
+    else{
+        printf("result was null\n");
+    }*/
     for(;;){
         struct timeval timeout;
         FD_ZERO(&rfds);
@@ -336,6 +436,7 @@ int main(int argc, char **argv)
                             newconnection->conn_ssl = server_ssl;
                             newconnection->conn_fd = sock;
                             newconnection->username = "anonymous";
+                            newconnection->curr_room = "none";
                             g_tree_insert(userlist, client, newconnection);
 
                             //printf("user added with fd = %d\n", sock);
