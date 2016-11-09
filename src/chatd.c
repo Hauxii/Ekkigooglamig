@@ -226,6 +226,11 @@ gboolean get_data_from_users(gpointer key, gpointer user, gpointer ret){
                         g_tree_foreach(userlist, send_pm, msg_sender);
                     } 
                 }
+                if (strncmp("/help", buffer, 5) == 0){
+                    char help[1024];
+                    snprintf(help, 1024, "\"/user [Your Username]\" - registers you as a user\n\"/who\" - lists all users online\n\"/say [Username]\" - sends a personal message to another user\n\"/join [Chatroom]\" - lets you join a chatroom\n");
+                    send_message((void *)curr_user, &help);
+                }
             }
             else{
                 buffer[bytes] = '\0';
@@ -320,8 +325,8 @@ int main(int argc, char **argv)
                     else{
                         char welcome[1024] = {'\0'};
                         //snprintf(buffer, 255, "%s: %s", curr_user->username, message);
-                        snprintf(welcome, 1024, "Welcome!\nTo start using the chat you have to authenticate a username with the command \"/user [Your Username]\"\n");
-                        err = SSL_write(server_ssl, "Welcome!", 8);
+                        snprintf(welcome, 1024, "Welcome!\nTo start using the chat you have to authenticate a username with the command \"/user [Your Username]\"\nType \"/help\" to get a list of commands");
+                        err = SSL_write(server_ssl, welcome, sizeof(welcome)-1);
                         
                         if(err == -1){
                             printf("ERROR SENDING MESSAGE\n");
