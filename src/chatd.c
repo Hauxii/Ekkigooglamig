@@ -89,6 +89,7 @@ void timestamp(void* ptr){
     g_date_time_unref(timestamp);
     g_free(str);
 }
+
 gboolean update_fd(gpointer key, gpointer user, gpointer ret){
     //get rid of warning
     if(key == NULL){
@@ -229,8 +230,6 @@ gboolean get_data_from_users(gpointer key, gpointer user, gpointer ret){
                 send_message((void *)curr_user, "SERVER: please authenticate a username with \"/user [your username]\"");
             }
             else if(buffer[0] == '/'){
-                printf("Client sent command\n");
-                printf("from client: %s\n", buffer);
                 if (strncmp("/who", buffer, 4) == 0){
 
                     //TODO if there is something after who it should says wrong command
@@ -280,9 +279,19 @@ gboolean get_data_from_users(gpointer key, gpointer user, gpointer ret){
                     char *receiver = strndup(&(buffer[i]), j - i);
                     char *message = &buffer[j + 1];
 
-                    snprintf(buffer, 255, "%s: %s", curr_user->username, message);
+                    GDateTime *timestamp;
+                    timestamp = g_date_time_new_now_local();
+                    char *str = g_date_time_format(timestamp, "%x %X");
+
+                    char temp[256];
+                    snprintf(temp, 255, "<%s> %s: ", str, curr_user->username);
+                    GString *msg = g_string_new("");
+
+                    g_string_append(msg, temp);
+                    g_string_append(msg, message);
+
                     struct message_with_info* msg_sender = g_new(struct message_with_info, 1);
-                    msg_sender->message = buffer;
+                    msg_sender->message = (char *)msg->str;
                     msg_sender->info = receiver;
 
                     if(strncmp("anonymous", msg_sender->info, 9) == 0){
@@ -292,6 +301,9 @@ gboolean get_data_from_users(gpointer key, gpointer user, gpointer ret){
                         g_tree_foreach(userlist, send_pm, msg_sender);
                     }
 
+                    g_date_time_unref(timestamp);
+                    g_free(str);
+                    g_string_free(msg, TRUE);
 
                 }
                 if (strncmp("/help", buffer, 5) == 0){
