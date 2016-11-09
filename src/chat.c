@@ -222,6 +222,8 @@ void readline_callback(char *line)
                 //char *message = strndup(&(line[j]), j - i - 1);
 
                 /* Send private message to receiver. */
+                snprintf(buffer, 255, "%s", line);
+                SSL_write(server_ssl, buffer, strlen(buffer));
 
                 return;
         }
